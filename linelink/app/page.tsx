@@ -21,19 +21,6 @@ export default function LandingPage() {
               <span className="text-xl font-medium text-gray-900">LineLink</span>
             </div>
 
-            {/* Desktop Navigation */}
-            {/* <nav className="hidden md:flex items-center space-x-6">
-              <Link href="#features" className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
-                Features
-              </Link>
-              <Link href="#solutions" className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
-                Solutions
-              </Link>
-              <Link href="#pricing" className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
-                Pricing
-              </Link>
-            </nav> */}
-
             <div className="hidden md:flex items-center space-x-3">
               <Link href="/signin">
                 <Button variant="ghost" className="text-gray-700 hover:text-blue-600 hover:bg-blue-50">
