@@ -21,7 +21,7 @@ export default function DashboardSidebar({ sections, selected, setSelected, side
             className={`bg-white rounded-lg shadow-md flex-shrink-0 transition-all duration-200 z-10
         ${sidebarOpen ? 'block absolute left-0 top-20 w-64' : 'hidden'}
         lg:block lg:static lg:w-64 lg:mr-8`}
-            style={{ maxHeight: 'calc(100vh - 6rem)', height: '100%', overflowY: 'auto' }}
+            style={{ maxHeight: 'calc(100vh - 6rem)', overflowY: 'auto' }}
         >
             <ul className="py-4">
                 {sections.map((section) => (

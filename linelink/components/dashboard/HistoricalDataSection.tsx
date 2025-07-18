@@ -32,37 +32,46 @@ export default function HistoricalDataSection() {
     const [lastUpdated, setLastUpdated] = useState(getNowString())
     useEffect(() => { setLastUpdated(getNowString()) }, [])
     return (
-        <div className="bg-white rounded-lg shadow p-6 overflow-x-auto">
+        <div className="overflow-x-auto">
             <LiveStatusBar lastUpdated={lastUpdated} />
-            <h2 className="text-xl font-bold mb-4 flex items-center"><ClipboardList className="w-5 h-5 mr-2" />Historical Work Orders</h2>
-            <table className="min-w-full text-sm">
-                <thead>
-                    <tr className="text-left text-gray-700 border-b">
-                        <th className="py-2 px-2">Work Order</th>
-                        <th className="py-2 px-2">Completed</th>
-                        <th className="py-2 px-2">Missing Parts</th>
-                        <th className="py-2 px-2">Resolution</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {mockHistoricalData.map(order => (
-                        <tr key={order.id} className="border-b last:border-0">
-                            <td className="py-2 px-2 font-medium">{order.id} - {order.name}</td>
-                            <td className="py-2 px-2">{order.completedAt}</td>
-                            <td className="py-2 px-2">
-                                {order.missingParts.map((mp, i) => (
-                                    <div key={i} className="flex items-center gap-2">
-                                        <Package className="w-4 h-4 text-gray-500" />
-                                        <span>Part #{mp.part} &times; {mp.qty}</span>
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 ml-1">{mp.status}</span>
-                                    </div>
-                                ))}
-                            </td>
-                            <td className="py-2 px-2">{order.resolution}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            <div className="flex flex-col lg:flex-row gap-6 min-w-[600px]">
+                {/* Historical Data Card */}
+                <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
+                    <h2 className="text-2xl font-bold mb-6 flex items-center"><ClipboardList className="w-6 h-6 mr-3" />Historical Work Orders</h2>
+                    <table className="min-w-full text-base">
+                        <thead>
+                            <tr className="text-left text-gray-700 border-b">
+                                <th className="py-3 px-4">Work Order</th>
+                                <th className="py-3 px-4">Completed</th>
+                                <th className="py-3 px-4">Missing Parts</th>
+                                <th className="py-3 px-4">Resolution</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {mockHistoricalData.map(order => (
+                                <tr key={order.id} className="border-b last:border-0">
+                                    <td className="py-3 px-4 font-semibold">{order.id} - {order.name}</td>
+                                    <td className="py-3 px-4">{order.completedAt}</td>
+                                    <td className="py-3 px-4">
+                                        {order.missingParts.map((mp, i) => (
+                                            <div key={i} className="flex items-center gap-3">
+                                                <Package className="w-5 h-5 text-gray-500" />
+                                                <span>Part #{mp.part} &times; {mp.qty}</span>
+                                                <span className="text-xs px-3 py-1 rounded-full bg-green-100 text-green-800 ml-2">{mp.status}</span>
+                                            </div>
+                                        ))}
+                                    </td>
+                                    <td className="py-3 px-4">{order.resolution}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                {/* Placeholder for side-by-side content if needed */}
+                {/* <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
+                    ...
+                </div> */}
+            </div>
         </div>
     )
 } 

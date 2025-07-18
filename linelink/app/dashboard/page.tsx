@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import type React from "react"
-import { Monitor, BarChart3, Users, Shield, AlertTriangle, CheckCircle, MessageCircle, Package, Truck, ClipboardList, Key, History, ListChecks, Clock, XCircle, Menu, X } from "lucide-react"
+import React, { useState, useEffect } from "react"
+import { Monitor, BarChart3, Users, Shield, AlertTriangle, CheckCircle, MessageCircle, Package, Truck, ClipboardList, Key, History, ListChecks, Clock, XCircle, Menu, X, CalendarPlus, Video } from "lucide-react"
 import { Button } from "../../components/ui/button"
 import WorkOrdersSection from "../../components/dashboard/WorkOrdersSection"
 import DashboardSidebar from "../../components/dashboard/DashboardSidebar"
@@ -12,6 +11,9 @@ import AuditTrailSection from "../../components/dashboard/AuditTrailSection"
 import ReceivingInterfaceSection from "../../components/dashboard/ReceivingInterfaceSection"
 import ProductionOverviewSection from "../../components/dashboard/ProductionOverviewSection"
 import CommentsSection from "../../components/dashboard/CommentsSection"
+import ScheduleMeetingModal from "../../components/ScheduleMeetingModal"
+import UserSelectModal from "../../components/UserSelectModal"
+import CalendarSidebar from "../../components/dashboard/CalendarSidebar"
 
 // Mock data for missing parts (should match MissingPartsSection)
 const mockMissingParts = [
@@ -119,9 +121,189 @@ const sections = [
 
 ]
 
+// Fetch Google Calendar events created by this app
+async function fetchAppMeetings(accessToken: string) {
+    const now = new Date().toISOString();
+    const maxResults = 20;
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(now)}&maxResults=${maxResults}&singleEvents=true&orderBy=startTime`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const data = await res.json();
+    if (!data.items) return [];
+    // Filter: Only events with summary starting with 'Scheduled Meeting'
+    return data.items
+        .filter((event: any) => event.summary && event.summary.startsWith('Scheduled Meeting'))
+        .map((event: any) => ({
+            title: event.summary,
+            start: event.start.dateTime || event.start.date, // dateTime for timed, date for all-day
+            end: event.end.dateTime || event.end.date,
+        }));
+}
+
 export default function Dashboard() {
     const [selected, setSelected] = useState(sections[0].key)
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    const [callModalOpen, setCallModalOpen] = useState(false)
+    const [meetLink, setMeetLink] = useState<string | null>(null)
+    const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+    const [loading, setLoading] = useState(false)
+    // TODO: Store and retrieve Google access token securely (localStorage, cookie, or backend session)
+    const [accessToken, setAccessToken] = useState<string | null>(null)
+    const [callDropdownOpen, setCallDropdownOpen] = useState(false)
+    const [userSelectOpen, setUserSelectOpen] = useState(false)
+    const [selectedUserEmail, setSelectedUserEmail] = useState<string | null>(null)
+    const [meetingType, setMeetingType] = useState<'instant' | 'scheduled' | null>(null)
+    const [showSuccessModal, setShowSuccessModal] = useState(false)
+    const [meetings, setMeetings] = useState<Array<{ title: string; start: string; end: string }>>([])
+
+    // Handle OAuth callback (if code in URL)
+    useEffect(() => {
+        const url = new URL(window.location.href)
+        const code = url.searchParams.get('code')
+        // Only POST if code exists and accessToken is not set
+        if (code && !accessToken && !loading) {
+            setLoading(true)
+            fetch('/api/google/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code }),
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.access_token) {
+                        setAccessToken(data.access_token)
+                        // Remove code from URL immediately after successful exchange
+                        window.history.replaceState({}, document.title, url.pathname)
+                    }
+                })
+                .finally(() => setLoading(false))
+        }
+    }, [accessToken, loading])
+
+    // On mount, load access token from localStorage if present
+    useEffect(() => {
+        const storedToken = window.localStorage.getItem('google_access_token');
+        if (storedToken) {
+            setAccessToken(storedToken);
+        }
+    }, []);
+
+    // Add event listener to close dropdown when clicking outside
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            const dropdown = document.getElementById('call-dropdown')
+            if (dropdown && !dropdown.contains(e.target as Node)) {
+                setCallDropdownOpen(false)
+            }
+        }
+        if (callDropdownOpen) {
+            document.addEventListener('mousedown', handleClick)
+        } else {
+            document.removeEventListener('mousedown', handleClick)
+        }
+        return () => document.removeEventListener('mousedown', handleClick)
+    }, [callDropdownOpen])
+
+    // For instant/scheduled meeting: after selecting user, create the meeting or open schedule modal
+    useEffect(() => {
+        if (selectedUserEmail && userSelectOpen === false && meetingType) {
+            if (!accessToken && !loading) {
+                // Trigger OAuth flow and preserve state
+                window.sessionStorage.setItem('pendingMeetingType', meetingType)
+                window.sessionStorage.setItem('pendingUserEmail', selectedUserEmail)
+                window.location.href = '/api/google/auth'
+                return
+            }
+            if (accessToken) {
+                if (meetingType === 'instant') {
+                    handleStartInstantMeetingWithAttendee(selectedUserEmail)
+                    setSelectedUserEmail(null)
+                    setMeetingType(null)
+                } else if (meetingType === 'scheduled') {
+                    setScheduleAttendee(selectedUserEmail)
+                    setScheduleModalOpen(true)
+                    setSelectedUserEmail(null)
+                    setMeetingType(null)
+                }
+            }
+        }
+        // eslint-disable-next-line
+    }, [selectedUserEmail, userSelectOpen, meetingType, accessToken, loading])
+
+    // On mount, check for pending meeting after OAuth
+    useEffect(() => {
+        const pendingType = window.sessionStorage.getItem('pendingMeetingType') as 'instant' | 'scheduled' | null
+        const pendingEmail = window.sessionStorage.getItem('pendingUserEmail')
+        if (accessToken && pendingType && pendingEmail) {
+            setMeetingType(pendingType)
+            setSelectedUserEmail(pendingEmail)
+            window.sessionStorage.removeItem('pendingMeetingType')
+            window.sessionStorage.removeItem('pendingUserEmail')
+        }
+    }, [accessToken])
+
+    // Fetch meetings after authentication
+    useEffect(() => {
+        if (accessToken) {
+            fetchAppMeetings(accessToken).then(setMeetings);
+        }
+    }, [accessToken]);
+
+    const handleStartInstantMeetingWithAttendee = async (otherUserEmail: string) => {
+        setLoading(true)
+        // TODO: Replace with real current user email if available
+        const currentUserEmail = "you@company.com"
+        if (!accessToken) {
+            window.location.href = '/api/google/auth'
+            return
+        }
+        const res = await fetch('/api/google/meet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token: accessToken, type: 'instant', attendees: [currentUserEmail, otherUserEmail] }),
+        })
+        const data = await res.json()
+        setMeetLink(data.meetLink)
+        setCallModalOpen(true)
+        setLoading(false)
+    }
+
+    // For scheduled meeting: pass selected email to schedule modal
+    const [scheduleAttendee, setScheduleAttendee] = useState<string | null>(null)
+    const handleScheduleMeeting = async (start: string, end: string, summary: string, description: string) => {
+        console.log('Scheduling meeting with:', { start, end, summary, description, scheduleAttendee });
+        setLoading(true)
+        const currentUserEmail = "you@company.com"
+        if (!accessToken) {
+            window.location.href = '/api/google/auth'
+            return
+        }
+        const attendees = [currentUserEmail]
+        if (scheduleAttendee) attendees.push(scheduleAttendee)
+        const res = await fetch('/api/google/meet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token: accessToken, type: 'scheduled', start, end, summary, description, attendees }),
+        })
+        const data = await res.json()
+        console.log('Google Meet API response:', data)
+        setMeetLink(data.meetLink)
+        setCallModalOpen(true)
+        setLoading(false)
+        setScheduleAttendee(null)
+        // Refetch meetings from Google Calendar after scheduling
+        if (accessToken) {
+            fetchAppMeetings(accessToken).then(setMeetings);
+        }
+        // Show success modal after scheduling
+        setShowSuccessModal(true)
+        setTimeout(() => {
+            setShowSuccessModal(false)
+            setScheduleModalOpen(false)
+            setCallModalOpen(false)
+            setMeetLink(null)
+        }, 2000)
+    }
 
     const selectedSection = sections.find((s) => s.key === selected)
 
@@ -137,6 +319,32 @@ export default function Dashboard() {
                             <span className="text-xl font-medium text-gray-900">LineLink</span>
                         </div>
                         <div className="flex items-center space-x-3">
+                            {/* Start Call Dropdown */}
+                            <div className="relative">
+                                <Button variant="outline" className="flex items-center gap-2" disabled={loading} onClick={() => setCallDropdownOpen(v => !v)}>
+                                    <Video className="w-5 h-5" />
+                                    Start Call
+                                    <span className="ml-1">▼</span>
+                                </Button>
+                                {callDropdownOpen && (
+                                    <div id="call-dropdown" className="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg z-50 border">
+                                        <button
+                                            className="w-full flex items-center px-4 py-2 hover:bg-gray-100 text-left"
+                                            onClick={() => { setCallDropdownOpen(false); setUserSelectOpen(true); setMeetingType('instant'); }}
+                                            disabled={loading}
+                                        >
+                                            <Video className="w-4 h-4 mr-2" />Instant Meeting
+                                        </button>
+                                        <button
+                                            className="w-full flex items-center px-4 py-2 hover:bg-gray-100 text-left"
+                                            onClick={() => { setCallDropdownOpen(false); setUserSelectOpen(true); setMeetingType('scheduled'); }}
+                                            disabled={loading}
+                                        >
+                                            <CalendarPlus className="w-4 h-4 mr-2" />Schedule Meeting
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                             <Button variant="ghost" className="text-gray-700 hover:text-blue-600 hover:bg-blue-50">Sign out</Button>
                             <button className="lg:hidden ml-2 p-2 rounded hover:bg-gray-100" onClick={() => setSidebarOpen(!sidebarOpen)}>
                                 {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -145,15 +353,65 @@ export default function Dashboard() {
                     </div>
                 </div>
             </header>
-            <div className="flex flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" style={{ height: 'calc(100vh - 6rem)' }}>
-                {/* Sidebar */}
-                <DashboardSidebar
-                    sections={sections}
-                    selected={selected}
-                    setSelected={setSelected}
-                    sidebarOpen={sidebarOpen}
-                    setSidebarOpen={setSidebarOpen}
+            {/* User Select Modal for both meeting types */}
+            {userSelectOpen && (
+                <UserSelectModal
+                    onSelect={email => {
+                        setUserSelectOpen(false)
+                        setSelectedUserEmail(email)
+                    }}
+                    onClose={() => setUserSelectOpen(false)}
+                    loading={loading}
                 />
+            )}
+            {/* Call Modal */}
+            {callModalOpen && meetLink && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 relative animate-fade-in">
+                        <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onClick={() => setCallModalOpen(false)} aria-label="Close"><X className="w-6 h-6" /></button>
+                        <h3 className="font-bold text-2xl mb-4">Google Meet Link</h3>
+                        <a href={meetLink} target="_blank" rel="noopener noreferrer" className="block text-blue-600 underline text-lg mb-4 break-all">{meetLink}</a>
+                        <a href={meetLink} target="_blank" rel="noopener noreferrer" className="block w-full">
+                            <Button className="w-full mt-2" onClick={() => setCallModalOpen(false)}>
+                                Join Meeting
+                            </Button>
+                        </a>
+                    </div>
+                </div>
+            )}
+            {/* Schedule Modal */}
+            {scheduleModalOpen && (
+                <>
+                    {console.log('Rendering ScheduleMeetingModal')}
+                    <ScheduleMeetingModal
+                        onClose={() => setScheduleModalOpen(false)}
+                        onSchedule={(...args) => { console.log('onSchedule called', args); handleScheduleMeeting(...args); }}
+                        loading={loading}
+                    />
+                </>
+            )}
+            {/* Success Modal */}
+            {showSuccessModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 relative animate-fade-in flex flex-col items-center">
+                        <span className="text-green-500 text-5xl mb-4">✔️</span>
+                        <h3 className="font-bold text-2xl mb-2">Meeting Scheduled!</h3>
+                        <p className="text-gray-600 mb-4 text-center">Your meeting has been added to your calendar.</p>
+                    </div>
+                </div>
+            )}
+            <div className="flex flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {/* Sidebar */}
+                <div className="flex flex-col w-64 mr-8" style={{ overflowY: 'auto' }}>
+                    <DashboardSidebar
+                        sections={sections}
+                        selected={selected}
+                        setSelected={setSelected}
+                        sidebarOpen={sidebarOpen}
+                        setSidebarOpen={setSidebarOpen}
+                    />
+                    {meetings.length > 0 && <div className="mt-4"><CalendarSidebar events={meetings} /></div>}
+                </div>
                 {/* Main Content */}
                 <main className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 6rem)' }}>
                     {selectedSection ? selectedSection.content : null}

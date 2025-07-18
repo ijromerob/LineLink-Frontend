@@ -36,36 +36,45 @@ const mockAuditTrail = [
 ]
 
 function getNowString() {
-  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 export default function AuditTrailSection() {
-  const [lastUpdated, setLastUpdated] = useState(getNowString())
-  useEffect(() => { setLastUpdated(getNowString()) }, [])
+    const [lastUpdated, setLastUpdated] = useState(getNowString())
+    useEffect(() => { setLastUpdated(getNowString()) }, [])
     return (
-        <div className="bg-white rounded-lg shadow p-6 overflow-x-auto">
+        <div className="overflow-x-auto">
             <LiveStatusBar lastUpdated={lastUpdated} />
-            <h2 className="text-xl font-bold mb-4 flex items-center"><MessageCircle className="w-5 h-5 mr-2" />Audit Trail</h2>
-            <table className="min-w-full text-sm">
-                <thead>
-                    <tr className="text-left text-gray-700 border-b">
-                        <th className="py-2 px-2">Time</th>
-                        <th className="py-2 px-2">User</th>
-                        <th className="py-2 px-2">Action</th>
-                        <th className="py-2 px-2">Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {mockAuditTrail.map((entry, i) => (
-                        <tr key={i} className="border-b last:border-0">
-                            <td className="py-2 px-2">{entry.time}</td>
-                            <td className="py-2 px-2 font-medium">{entry.user}</td>
-                            <td className="py-2 px-2">{entry.action}</td>
-                            <td className="py-2 px-2">{entry.details}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            <div className="flex flex-col lg:flex-row gap-6 min-w-[600px]">
+                {/* Audit Trail Card */}
+                <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
+                    <h2 className="text-2xl font-bold mb-6 flex items-center"><MessageCircle className="w-6 h-6 mr-3" />Audit Trail</h2>
+                    <table className="min-w-full text-base">
+                        <thead>
+                            <tr className="text-left text-gray-700 border-b">
+                                <th className="py-3 px-4">Time</th>
+                                <th className="py-3 px-4">User</th>
+                                <th className="py-3 px-4">Action</th>
+                                <th className="py-3 px-4">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {mockAuditTrail.map((entry, i) => (
+                                <tr key={i} className="border-b last:border-0">
+                                    <td className="py-3 px-4">{entry.time}</td>
+                                    <td className="py-3 px-4 font-semibold">{entry.user}</td>
+                                    <td className="py-3 px-4">{entry.action}</td>
+                                    <td className="py-3 px-4">{entry.details}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                {/* Placeholder for side-by-side content if needed */}
+                {/* <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
+                    ...
+                </div> */}
+            </div>
         </div>
     )
 } 

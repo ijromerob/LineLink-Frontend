@@ -42,10 +42,10 @@ export default function ProductionOverviewSection() {
         setLastUpdated(getNowString())
     }, [])
     return (
-        <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
+        <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2">
             <LiveStatusBar lastUpdated={lastUpdated} />
             {/* Metric Cards Row */}
-            <div className="grid grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
                 <MetricCard label="Total Orders" value={metrics.totalOrders} icon={<ClipboardIcon />} color="bg-blue-100 text-blue-800" />
                 <MetricCard label="Completed" value={metrics.completed} icon={<CheckCircle className="w-5 h-5" />} color="bg-green-100 text-green-800" />
                 <MetricCard label="At Risk" value={metrics.atRisk} icon={<AlertTriangle className="w-5 h-5" />} color="bg-yellow-100 text-yellow-800" />
@@ -54,10 +54,10 @@ export default function ProductionOverviewSection() {
             </div>
 
             {/* Charts Row */}
-            <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-white rounded-lg shadow p-4">
-                    <h4 className="font-semibold mb-2">Completions Over Time</h4>
-                    <ResponsiveContainer width="100%" height={200}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div className="bg-white rounded-xl shadow-lg p-8">
+                    <h4 className="font-semibold text-lg mb-4">Completions Over Time</h4>
+                    <ResponsiveContainer width="100%" height={220}>
                         <BarChart data={completionsOverTime}>
                             <XAxis dataKey="date" />
                             <YAxis allowDecimals={false} />
@@ -66,9 +66,9 @@ export default function ProductionOverviewSection() {
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                    <h4 className="font-semibold mb-2">Work Order Status Breakdown</h4>
-                    <ResponsiveContainer width="100%" height={200}>
+                <div className="bg-white rounded-xl shadow-lg p-8">
+                    <h4 className="font-semibold text-lg mb-4">Work Order Status Breakdown</h4>
+                    <ResponsiveContainer width="100%" height={220}>
                         <PieChart>
                             <Pie
                                 data={statusBreakdown}
@@ -76,7 +76,7 @@ export default function ProductionOverviewSection() {
                                 nameKey="name"
                                 cx="50%"
                                 cy="50%"
-                                outerRadius={70}
+                                outerRadius={80}
                                 label
                             >
                                 {statusBreakdown.map((entry, index) => (
