@@ -13,9 +13,10 @@ interface DashboardSidebarProps {
     setSelected: (key: string) => void
     sidebarOpen: boolean
     setSidebarOpen: (open: boolean) => void
+    sectionNotifCounts?: Record<string, number>
 }
 
-export default function DashboardSidebar({ sections, selected, setSelected, sidebarOpen, setSidebarOpen }: DashboardSidebarProps) {
+export default function DashboardSidebar({ sections, selected, setSelected, sidebarOpen, setSidebarOpen, sectionNotifCounts }: DashboardSidebarProps) {
     return (
         <nav
             className={`bg-white rounded-lg shadow-md flex-shrink-0 transition-all duration-200 z-10
@@ -37,10 +38,9 @@ export default function DashboardSidebar({ sections, selected, setSelected, side
                             {section.icon}
                             <span className="relative flex items-center">
                                 {section.label}
-                                {typeof section.notificationCount === 'number' && section.notificationCount > 0 && (
-                                    <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-500 text-white min-w-[20px] h-5">
-                                        {section.notificationCount > 9 ? '9+' : section.notificationCount}
-                                    </span>
+                                {/* Red dot indicator for notifications */}
+                                {sectionNotifCounts && sectionNotifCounts[section.key] > 0 && (
+                                    <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block"></span>
                                 )}
                             </span>
                         </button>

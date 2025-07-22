@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { Monitor, BarChart3, Users, Shield, AlertTriangle, CheckCircle, MessageCircle, Package, Truck, ClipboardList, Key, History, ListChecks, Clock, XCircle, Menu, X, CalendarPlus, Video } from "lucide-react"
+import { Monitor, BarChart3, Users, Shield, AlertTriangle, CheckCircle, MessageCircle, Package, Truck, ClipboardList, Key, History, ListChecks, Clock, XCircle, Menu, X, CalendarPlus, Video, Bell } from "lucide-react"
 import { Button } from "../../components/ui/button"
 import WorkOrdersSection from "../../components/dashboard/WorkOrdersSection"
 import DashboardSidebar from "../../components/dashboard/DashboardSidebar"
@@ -14,6 +14,7 @@ import CommentsSection from "../../components/dashboard/CommentsSection"
 import ScheduleMeetingModal from "../../components/ScheduleMeetingModal"
 import UserSelectModal from "../../components/UserSelectModal"
 import CalendarSidebar from "../../components/dashboard/CalendarSidebar"
+import Link from "next/link"
 
 // Mock data for missing parts (should match MissingPartsSection)
 const mockMissingParts = [
@@ -51,6 +52,14 @@ const missingPartsNotificationCount = mockMissingParts.filter(p => p.status === 
 // Restore other notification counts for other sections
 const failedWorkOrdersCount = 1 // e.g., number of failed work orders
 const newCommentsCount = 2 // e.g., number of new/unread comments
+
+// Notification mock data
+const mockNotifications = [
+    { id: 1, section: "workOrders", message: "Work Order WO-001 failed.", timestamp: "10:00", read: false },
+    { id: 2, section: "comments", message: "New comment on WO-002.", timestamp: "10:05", read: false },
+    { id: 3, section: "missingParts", message: "Part #555 is missing.", timestamp: "10:10", read: false },
+    { id: 4, section: "workOrders", message: "Work Order WO-003 completed.", timestamp: "10:15", read: true },
+]
 
 const sections = [
     {
@@ -140,6 +149,13 @@ async function fetchAppMeetings(accessToken: string) {
         }));
 }
 
+// Mock user data
+const mockUser = {
+    name: "Jane Doe",
+    title: "Production Manager",
+    avatar: "JD" // Use initials for avatar
+};
+
 export default function Dashboard() {
     const [selected, setSelected] = useState(sections[0].key)
     const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -155,6 +171,9 @@ export default function Dashboard() {
     const [meetingType, setMeetingType] = useState<'instant' | 'scheduled' | null>(null)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
     const [meetings, setMeetings] = useState<Array<{ title: string; start: string; end: string }>>([])
+    const [notifications, setNotifications] = useState(mockNotifications)
+    const [notifModalOpen, setNotifModalOpen] = useState(false)
+    const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
 
     // Handle OAuth callback (if code in URL)
     useEffect(() => {
@@ -305,6 +324,14 @@ export default function Dashboard() {
         }, 2000)
     }
 
+    // Calculate total unread notifications
+    const totalUnread = notifications.filter(n => !n.read).length
+    // Calculate per-section notification counts
+    const sectionNotifCounts = sections.reduce((acc, s) => {
+        acc[s.key] = notifications.filter(n => n.section === s.key && !n.read).length
+        return acc
+    }, {} as Record<string, number>)
+
     const selectedSection = sections.find((s) => s.key === selected)
 
     return (
@@ -319,6 +346,37 @@ export default function Dashboard() {
                             <span className="text-xl font-medium text-gray-900">LineLink</span>
                         </div>
                         <div className="flex items-center space-x-3">
+                            {/* Notification Icon */}
+                            {/* In the header, wrap the notification icon in a relative div for dropdown positioning */}
+                            <div className="relative">
+                                <button className="relative" onClick={() => setNotifModalOpen(v => !v)} aria-label="Notifications">
+                                    <Bell className="w-6 h-6 text-gray-700" />
+                                    {notifications.length > 0 && (
+                                        <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">{notifications.length}</span>
+                                    )}
+                                </button>
+                                {/* Notification Dropdown Modal */}
+                                {notifModalOpen && (
+                                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl z-50 border animate-fade-in">
+                                        <div className="p-4">
+                                            <h3 className="font-bold text-lg mb-2">Notifications</h3>
+                                            <ul className="divide-y divide-gray-200 max-h-64 overflow-y-auto mb-4">
+                                                {notifications.length > 0 ? notifications.map(n => (
+                                                    <li key={n.id} className="py-2 flex flex-col">
+                                                        <span className="text-gray-800 text-sm">{n.message}</span>
+                                                        <span className="text-xs text-gray-400 mt-1">{n.timestamp}</span>
+                                                    </li>
+                                                )) : (
+                                                    <li className="py-2 text-gray-400 text-sm">No notifications.</li>
+                                                )}
+                                            </ul>
+                                            <Link href="/notifications">
+                                                <button className="w-full bg-blue-600 text-white rounded px-4 py-2">See more</button>
+                                            </Link>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                             {/* Start Call Dropdown */}
                             <div className="relative">
                                 <Button variant="outline" className="flex items-center gap-2" disabled={loading} onClick={() => setCallDropdownOpen(v => !v)}>
@@ -345,7 +403,28 @@ export default function Dashboard() {
                                     </div>
                                 )}
                             </div>
-                            <Button variant="ghost" className="text-gray-700 hover:text-blue-600 hover:bg-blue-50">Sign out</Button>
+                            {/* Profile Avatar, Name, and Title directly in header */}
+                            <div className="relative">
+                                <button
+                                    className="flex items-center space-x-2 focus:outline-none"
+                                    onClick={() => setProfileDropdownOpen(v => !v)}
+                                    aria-label="Profile"
+                                    type="button"
+                                >
+                                    <div className="flex flex-col text-right">
+                                        <span className="font-bold text-gray-900 leading-tight">{mockUser.name}</span>
+                                        <span className="text-xs text-gray-500 leading-tight">{mockUser.title}</span>
+                                    </div>
+                                    <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-lg font-bold text-blue-700 border-2 border-white shadow-sm">
+                                        {mockUser.avatar}
+                                    </div>
+                                </button>
+                                {profileDropdownOpen && (
+                                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-2xl z-50 border animate-fade-in p-2 flex flex-col items-center">
+                                        <button className="w-full bg-red-100 text-red-700 rounded px-4 py-2 font-semibold hover:bg-red-200" onClick={() => {/* sign out logic here */ }}>Sign out</button>
+                                    </div>
+                                )}
+                            </div>
                             <button className="lg:hidden ml-2 p-2 rounded hover:bg-gray-100" onClick={() => setSidebarOpen(!sidebarOpen)}>
                                 {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                             </button>
@@ -400,6 +479,28 @@ export default function Dashboard() {
                     </div>
                 </div>
             )}
+            {/* Notification Modal */}
+            {/* This block is now redundant as notifications are in a dropdown */}
+            {/* <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 relative animate-fade-in">
+                    <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onClick={() => setNotifModalOpen(false)} aria-label="Close">✕</button>
+                    <h3 className="font-bold text-2xl mb-4">Notifications</h3>
+                    <ul className="divide-y divide-gray-200 mb-4">
+                        {notifications.filter(n => !n.read).slice(0, 3).map(n => (
+                            <li key={n.id} className="py-2 flex flex-col">
+                                <span className="text-gray-800 text-sm">{n.message}</span>
+                                <span className="text-xs text-gray-400 mt-1">{n.timestamp}</span>
+                            </li>
+                        ))}
+                        {notifications.filter(n => !n.read).length === 0 && (
+                            <li className="py-2 text-gray-400 text-sm">No new notifications.</li>
+                        )}
+                    </ul>
+                    <Link href="/notifications">
+                        <button className="w-full bg-blue-600 text-white rounded px-4 py-2">See more</button>
+                    </Link>
+                </div>
+            </div> */}
             <div className="flex flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Sidebar */}
                 <div className="flex flex-col w-64 mr-8" style={{ overflowY: 'auto' }}>
@@ -409,6 +510,7 @@ export default function Dashboard() {
                         setSelected={setSelected}
                         sidebarOpen={sidebarOpen}
                         setSidebarOpen={setSidebarOpen}
+                        sectionNotifCounts={sectionNotifCounts}
                     />
                     {meetings.length > 0 && <div className="mt-4"><CalendarSidebar events={meetings} /></div>}
                 </div>

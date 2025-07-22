@@ -153,7 +153,7 @@ export default function WorkOrdersSection() {
     }
 
     return (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <LiveStatusBar lastUpdated={lastUpdated} />
             <div className="flex gap-6 min-w-[900px]">
                 {statusColumns.map(col => (
