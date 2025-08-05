@@ -9,6 +9,7 @@ import { Monitor, Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth, useApi, useDebounce } from "@/contexts/AuthContext";
+import toast from 'react-hot-toast';
 
 interface SignInFormData {
   email: string;
@@ -54,12 +55,12 @@ export default function SignIn() {
     rememberMe: false,
   });
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      router.push("/dashboard");
-    }
-  }, [isAuthenticated, authLoading, router]);
+  // Removed useEffect that redirects to /dashboard when isAuthenticated changes
+  // useEffect(() => {
+  //   if (!authLoading && isAuthenticated) {
+  //     router.push("/dashboard");
+  //   }
+  // }, [isAuthenticated, authLoading, router]);
 
   // Debounced email validation
   const debouncedEmailValidation = useDebounce(async (email: string) => {
@@ -126,7 +127,7 @@ export default function SignIn() {
     setError("");
     setFieldErrors({});
 
-    // Validate form fields
+    // Validate all fields
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
@@ -135,14 +136,17 @@ export default function SignIn() {
     }
 
     try {
-      const response = await api.post<SignInResponse>("/users/signin", {
+      const response = await api.post("/users/signin", {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
-        rememberMe: formData.rememberMe,
       });
 
-      if (response.data?.user && response.data?.token) {
-        await login(response.data.token, response.data.user);
+      // Accept backend response with user and token at root
+      if (response.user && response.token) {
+        await login(response.token, response.user);
+        toast.success("Signed in successfully!");
+        router.push("/dashboard");
+        return;
       }
     } catch (error: any) {
       console.error("Signin error:", error);
@@ -263,9 +267,8 @@ export default function SignIn() {
                   onChange={handleInputChange}
                   placeholder="Enter your email"
                   required
-                  className={`h-11 ${
-                    fieldErrors.email ? "border-red-500 focus:ring-red-500" : ""
-                  }`}
+                  className={`h-11 ${fieldErrors.email ? "border-red-500 focus:ring-red-500" : ""
+                    }`}
                   disabled={isLoading}
                 />
                 {fieldErrors.email && (
@@ -291,11 +294,10 @@ export default function SignIn() {
                     onChange={handleInputChange}
                     placeholder="Enter your password"
                     required
-                    className={`h-11 pr-10 ${
-                      fieldErrors.password
-                        ? "border-red-500 focus:ring-red-500"
-                        : ""
-                    }`}
+                    className={`h-11 pr-10 ${fieldErrors.password
+                      ? "border-red-500 focus:ring-red-500"
+                      : ""
+                      }`}
                     disabled={isLoading}
                   />
                   <button

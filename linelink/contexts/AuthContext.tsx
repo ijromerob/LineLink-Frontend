@@ -66,13 +66,21 @@ class ApiClient {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
 
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('authToken')
+      : null;
+
+    // Prepare headers
+    const headers = new Headers(options.headers || {});
+    headers.set('Content-Type', 'application/json');
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
     const config: RequestInit = {
-      credentials: "include", // Always include httpOnly cookies
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
+      credentials: "include",
       ...options,
+      headers,
     };
 
     let response = await fetch(url, config);
@@ -246,7 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("user", JSON.stringify(userData));
         setUser(userData);
         setIsAuthenticated(true);
-        router.push("/dashboard"); // Add explicit redirect
+        // Removed router.push("/dashboard");
       } catch (error) {
         console.error("Login error:", error);
         setError("Failed to complete login");
@@ -276,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Logout error:", error);
     }
   }, [router]);
-  
+
   return (
     <AuthContext.Provider
       value={{

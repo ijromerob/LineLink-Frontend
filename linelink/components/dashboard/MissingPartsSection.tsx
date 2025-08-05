@@ -1,39 +1,8 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "../ui/button"
 import { Package, CheckCircle, Truck } from "lucide-react"
 import LiveStatusBar from "./LiveStatusBar"
-
-// Mock data: all requested parts from all work orders
-const mockMissingParts = [
-    {
-        id: 1,
-        workOrder: "WO-001",
-        part: "123",
-        qty: 10,
-        status: "Requested", // Requested | Dispatched | Acknowledged
-    },
-    {
-        id: 2,
-        workOrder: "WO-004",
-        part: "999",
-        qty: 2,
-        status: "Dispatched",
-    },
-    {
-        id: 3,
-        workOrder: "WO-002",
-        part: "555",
-        qty: 5,
-        status: "Requested",
-    },
-    {
-        id: 4,
-        workOrder: "WO-003",
-        part: "888",
-        qty: 1,
-        status: "Acknowledged",
-    },
-]
+import { useApi } from "@/contexts/AuthContext"
 
 const statusColors: Record<string, string> = {
     Requested: "bg-yellow-100 text-yellow-800",
@@ -46,17 +15,69 @@ function getNowString() {
 }
 
 export default function MissingPartsSection() {
-    const [parts, setParts] = useState(mockMissingParts)
+    const api = useApi();
+    const [parts, setParts] = useState<any[]>([])
     const [lastUpdated, setLastUpdated] = useState(getNowString())
-
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState("")
     // Simulate user role ("warehouse" or "production")
-    const userRole = "warehouse" as "warehouse" | "production" // Change to "production" to test prod view
+    const userRole = "warehouse" as "warehouse" | "production"
 
-    function handleDispatch(id: number) {
-        setParts(parts => parts.map(p => p.id === id ? { ...p, status: "Dispatched" } : p))
-        setLastUpdated(getNowString())
+    // Fetch and aggregate parts from all work orders
+    useEffect(() => {
+        const fetchParts = async () => {
+            setLoading(true)
+            setError("")
+            try {
+                const response = await api.get("/workorders/");
+                let workOrders = Array.isArray(response.work_orders) ? response.work_orders : [];
+                // Aggregate all partsRequested from all work orders
+                let allParts: any[] = [];
+                workOrders.forEach((wo: any) => {
+                    if (Array.isArray(wo.partsRequested)) {
+                        wo.partsRequested.forEach((p: any, idx: number) => {
+                            allParts.push({
+                                id: `${wo.work_order_id}-${p.part}-${idx}`,
+                                workOrder: wo.work_order_id,
+                                part: p.part,
+                                qty: p.qty,
+                                status: p.status || "Requested",
+                            });
+                        });
+                    }
+                });
+                setParts(allParts);
+                setLastUpdated(getNowString());
+            } catch (err) {
+                setError("Failed to fetch parts requests");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchParts();
+    }, [api]);
+
+    async function handleDispatch(id: string) {
+        const part = parts.find(p => p.id === id);
+        if (!part) return;
+        setLoading(true);
+        setError("");
+        try {
+            await api.post("/warehouse/dispatch", {
+                part_number: part.part,
+                quantity_supplied: part.qty,
+                station_number: "1",
+                work_order_id: part.workOrder,
+            });
+            setParts(parts => parts.map(p => p.id === id ? { ...p, status: "Dispatched" } : p));
+            setLastUpdated(getNowString());
+        } catch (err) {
+            setError("Failed to dispatch part");
+        } finally {
+            setLoading(false);
+        }
     }
-    function handleAcknowledge(id: number) {
+    function handleAcknowledge(id: string) {
         setParts(parts => parts.map(p => p.id === id ? { ...p, status: "Acknowledged" } : p))
         setLastUpdated(getNowString())
     }
@@ -64,6 +85,8 @@ export default function MissingPartsSection() {
     return (
         <div className="overflow-x-auto">
             <LiveStatusBar lastUpdated={lastUpdated} />
+            {error && <div className="text-red-500 mb-2">{error}</div>}
+            {loading && <div className="text-gray-500 mb-2">Loading...</div>}
             <div className="flex flex-col lg:flex-row gap-6 min-w-[600px]">
                 {/* Missing Parts Card */}
                 <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
@@ -103,10 +126,6 @@ export default function MissingPartsSection() {
                         </tbody>
                     </table>
                 </div>
-                {/* Placeholder for side-by-side content if needed */}
-                {/* <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
-                    ...
-                </div> */}
             </div>
         </div>
     )

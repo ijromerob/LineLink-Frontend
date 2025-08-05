@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth, useApi, useDebounce } from "@/contexts/AuthContext";
+import toast from 'react-hot-toast';
 
 interface SignUpFormData {
   firstName: string;
@@ -80,13 +81,6 @@ export default function SignUp() {
     terms: false,
   });
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      router.push("/dashboard");
-    }
-  }, [isAuthenticated, authLoading, router]);
-
   // Password strength calculation
   const calculatePasswordStrength = useCallback(
     (password: string): PasswordStrength => {
@@ -139,9 +133,8 @@ export default function SignUp() {
       case "lastName":
       case "company":
         if (typeof value === "string" && value.trim().length < 2) {
-          error = `${
-            name.charAt(0).toUpperCase() + name.slice(1)
-          } must be at least 2 characters`;
+          error = `${name.charAt(0).toUpperCase() + name.slice(1)
+            } must be at least 2 characters`;
         }
         break;
       case "email":
@@ -237,13 +230,20 @@ export default function SignUp() {
     }
 
     try {
-      const response = await api.post<SignUpResponse>("/users/signup", {
+      const response = await api.post("/users/signup", {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         company: formData.company.trim(),
       });
+
+      // Success: backend returns user_id
+      if (response.user_id) {
+        toast.success("Signup successful! Please sign in.");
+        router.push("/signin");
+        return;
+      }
 
       if (response.data?.user && response.token) {
         await login(response.token, response.data.user);
@@ -252,9 +252,9 @@ export default function SignUp() {
     } catch (error: any) {
       console.error("Signup error:", error);
 
-      if (error.message.includes("already exists")) {
+      if (error.message && error.message.includes("already exists")) {
         setFieldErrors({ email: "Email is already registered" });
-      } else if (error.message.includes("Network")) {
+      } else if (error.message && error.message.includes("Network")) {
         setError("Network error. Please check your connection and try again.");
       } else {
         setError(error.message || "An error occurred during signup");
@@ -397,11 +397,10 @@ export default function SignUp() {
                     onBlur={handleBlur}
                     placeholder="John"
                     required
-                    className={`h-11 ${
-                      fieldErrors.firstName
-                        ? "border-red-500 focus:ring-red-500"
-                        : ""
-                    }`}
+                    className={`h-11 ${fieldErrors.firstName
+                      ? "border-red-500 focus:ring-red-500"
+                      : ""
+                      }`}
                     disabled={isLoading}
                   />
                   {fieldErrors.firstName && (
@@ -426,11 +425,10 @@ export default function SignUp() {
                     onBlur={handleBlur}
                     placeholder="Doe"
                     required
-                    className={`h-11 ${
-                      fieldErrors.lastName
-                        ? "border-red-500 focus:ring-red-500"
-                        : ""
-                    }`}
+                    className={`h-11 ${fieldErrors.lastName
+                      ? "border-red-500 focus:ring-red-500"
+                      : ""
+                      }`}
                     disabled={isLoading}
                   />
                   {fieldErrors.lastName && (
@@ -450,23 +448,22 @@ export default function SignUp() {
                 </label>
                 <div className="relative">
                   <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      onBlur={handleBlur}
-                      placeholder="john@company.com"
-                      required
-                      className={`h-11 ${
-                      fieldErrors.email ? "border-red-500 focus:ring-red-500" : ""
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    placeholder="john@company.com"
+                    required
+                    className={`h-11 ${fieldErrors.email ? "border-red-500 focus:ring-red-500" : ""
                       }`}
-                      disabled={isLoading}
+                    disabled={isLoading}
                   />
-                  
-                  </div>
+
                 </div>
-                
+              </div>
+
 
               <div>
                 <label
@@ -484,11 +481,10 @@ export default function SignUp() {
                   onBlur={handleBlur}
                   placeholder="Your company"
                   required
-                  className={`h-11 ${
-                    fieldErrors.company
-                      ? "border-red-500 focus:ring-red-500"
-                      : ""
-                  }`}
+                  className={`h-11 ${fieldErrors.company
+                    ? "border-red-500 focus:ring-red-500"
+                    : ""
+                    }`}
                   disabled={isLoading}
                 />
                 {fieldErrors.company && (
@@ -536,11 +532,10 @@ export default function SignUp() {
                     onBlur={handleBlur}
                     placeholder="Create a strong password"
                     required
-                    className={`h-11 pr-10 ${
-                      fieldErrors.password
-                        ? "border-red-500 focus:ring-red-500"
-                        : ""
-                    }`}
+                    className={`h-11 pr-10 ${fieldErrors.password
+                      ? "border-red-500 focus:ring-red-500"
+                      : ""
+                      }`}
                     disabled={isLoading}
                   />
                   <button
@@ -577,11 +572,10 @@ export default function SignUp() {
                     {/* Password requirements checklist */}
                     <div className="grid grid-cols-2 gap-1 text-xs">
                       <div
-                        className={`flex items-center space-x-1 ${
-                          passwordStrength.requirements.length
-                            ? "text-green-600"
-                            : "text-gray-400"
-                        }`}
+                        className={`flex items-center space-x-1 ${passwordStrength.requirements.length
+                          ? "text-green-600"
+                          : "text-gray-400"
+                          }`}
                       >
                         {passwordStrength.requirements.length ? (
                           <CheckCircle className="w-3 h-3" />
@@ -591,11 +585,10 @@ export default function SignUp() {
                         <span>8+ characters</span>
                       </div>
                       <div
-                        className={`flex items-center space-x-1 ${
-                          passwordStrength.requirements.uppercase
-                            ? "text-green-600"
-                            : "text-gray-400"
-                        }`}
+                        className={`flex items-center space-x-1 ${passwordStrength.requirements.uppercase
+                          ? "text-green-600"
+                          : "text-gray-400"
+                          }`}
                       >
                         {passwordStrength.requirements.uppercase ? (
                           <CheckCircle className="w-3 h-3" />
@@ -605,11 +598,10 @@ export default function SignUp() {
                         <span>Uppercase</span>
                       </div>
                       <div
-                        className={`flex items-center space-x-1 ${
-                          passwordStrength.requirements.lowercase
-                            ? "text-green-600"
-                            : "text-gray-400"
-                        }`}
+                        className={`flex items-center space-x-1 ${passwordStrength.requirements.lowercase
+                          ? "text-green-600"
+                          : "text-gray-400"
+                          }`}
                       >
                         {passwordStrength.requirements.lowercase ? (
                           <CheckCircle className="w-3 h-3" />
@@ -619,11 +611,10 @@ export default function SignUp() {
                         <span>Lowercase</span>
                       </div>
                       <div
-                        className={`flex items-center space-x-1 ${
-                          passwordStrength.requirements.number
-                            ? "text-green-600"
-                            : "text-gray-400"
-                        }`}
+                        className={`flex items-center space-x-1 ${passwordStrength.requirements.number
+                          ? "text-green-600"
+                          : "text-gray-400"
+                          }`}
                       >
                         {passwordStrength.requirements.number ? (
                           <CheckCircle className="w-3 h-3" />
@@ -633,11 +624,10 @@ export default function SignUp() {
                         <span>Number</span>
                       </div>
                       <div
-                        className={`flex items-center space-x-1 ${
-                          passwordStrength.requirements.special
-                            ? "text-green-600"
-                            : "text-gray-400"
-                        }`}
+                        className={`flex items-center space-x-1 ${passwordStrength.requirements.special
+                          ? "text-green-600"
+                          : "text-gray-400"
+                          }`}
                       >
                         {passwordStrength.requirements.special ? (
                           <CheckCircle className="w-3 h-3" />
@@ -665,9 +655,8 @@ export default function SignUp() {
                   checked={formData.terms}
                   onChange={handleInputChange}
                   required
-                  className={`mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded ${
-                    fieldErrors.terms ? "border-red-500" : ""
-                  }`}
+                  className={`mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded ${fieldErrors.terms ? "border-red-500" : ""
+                    }`}
                   disabled={isLoading}
                 />
                 <label
