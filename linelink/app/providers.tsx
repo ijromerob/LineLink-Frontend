@@ -1,0 +1,16 @@
+
+
+import { SessionProvider } from 'next-auth/react';
+import { Provider } from 'react-redux';
+import store from '../store';
+import { AuthProvider } from '@/contexts/AuthContext';
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <Provider store={store}>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+    </Provider>
+  );
+}

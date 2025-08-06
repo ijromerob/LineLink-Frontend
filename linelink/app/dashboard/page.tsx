@@ -461,11 +461,24 @@ export default function Dashboard() {
                     </div>
                   </button>
                   {profileDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-2xl z-50 border animate-fade-in p-2 flex flex-col items-center">
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl z-50 border animate-fade-in p-2 flex flex-col space-y-2">
+                      <Link 
+                        href="/profile"
+                        className="w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center"
+                        onClick={() => setProfileDropdownOpen(false)}
+                      >
+                        <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        My Profile
+                      </Link>
                       <button
-                        className="w-full bg-red-100 text-red-700 rounded px-4 py-2 font-semibold hover:bg-red-200"
+                        className="w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center"
                         onClick={logout}
                       >
+                        <svg className="w-4 h-4 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
                         Sign out
                       </button>
                     </div>

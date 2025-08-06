@@ -10,7 +10,6 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
-      {/* Header - Meet Style */}
       <header className="sticky top-0 z-20 bg-white bg-opacity-90 backdrop-blur h-16 flex-shrink-0 shadow-sm flex items-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="flex justify-between items-center h-16">
