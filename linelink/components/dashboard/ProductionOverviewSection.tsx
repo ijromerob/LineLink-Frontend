@@ -1,80 +1,213 @@
 "use client"
 
-import { Monitor, BarChart3, Users, AlertTriangle, CheckCircle } from "lucide-react"
+import { BarChart3, AlertTriangle, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import LiveStatusBar from "./LiveStatusBar"
 import { useState, useEffect } from "react"
+import { useApi } from "@/contexts/AuthContext"
 
-const metrics = {
-    totalOrders: 24,
-    completed: 12,
-    atRisk: 3,
-    delayed: 2,
-    missingParts: 5,
+interface WorkOrder {
+    is_completed: boolean;
+    parts_missing: number;
+    parts_supplied: number;
+    product_number: string;
+    quantity_to_produce: number;
+    total_parts_needed: number;
+    work_order_id: string;
 }
 
-const completionsOverTime = [
-    { date: 'Mon', completed: 2 },
-    { date: 'Tue', completed: 3 },
-    { date: 'Wed', completed: 1 },
-    { date: 'Thu', completed: 4 },
-    { date: 'Fri', completed: 2 },
-    { date: 'Sat', completed: 0 },
-    { date: 'Sun', completed: 0 },
-]
+interface WorkOrdersResponse {
+    work_orders: WorkOrder[];
+}
 
-const statusBreakdown = [
-    { name: 'Completed', value: 12 },
-    { name: 'At Risk', value: 3 },
-    { name: 'Delayed', value: 2 },
-    { name: 'Active', value: 7 },
-]
+const COLORS = ['#22c55e', '#f59e0b', '#ef4444', '#3b82f6']
 
-const COLORS = ['#22c55e', '#facc15', '#ef4444', '#3b82f6']
-
-const metricTrends = {
-    totalOrders: { trend: "up" as "up", change: 2 },
-    completed: { trend: "up" as "up", change: 1 },
-    atRisk: { trend: "down" as "down", change: -1 },
-    delayed: { trend: "up" as "up", change: 1 },
-    missingParts: { trend: "down" as "down", change: -2 },
+const getRecentActivity = (workOrders: WorkOrder[]) => {
+    return workOrders
+        .sort((a, b) => b.work_order_id.localeCompare(a.work_order_id))
+        .slice(0, 5)
+        .map(wo => ({
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            user: 'System',
+            action: wo.is_completed 
+                ? `Completed ${wo.work_order_id}` 
+                : wo.parts_missing > 0 
+                    ? `Parts missing for ${wo.work_order_id}`
+                    : `In progress: ${wo.work_order_id}`
+        }));
 };
-
-const metricSub = {
-    totalOrders: "+2 today",
-    completed: "Avg. Time: 2.5h",
-    atRisk: "1 resolved",
-    delayed: "2 overdue",
-    missingParts: "3 resolved",
-};
-
-const recentActivity = [
-    { time: "09:15", user: "Alice", action: "Completed WO-003" },
-    { time: "09:20", user: "Bob", action: "Delayed WO-005" },
-    { time: "10:00", user: "Sam", action: "At Risk: WO-002" },
-    { time: "10:30", user: "Warehouse", action: "Parts Dispatched for WO-004" },
-    { time: "11:00", user: "Production", action: "Completed WO-001" },
-];
 
 function getNowString() {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 export default function ProductionOverviewSection() {
-    const [lastUpdated, setLastUpdated] = useState(getNowString())
+    const api = useApi();
+    const [lastUpdated, setLastUpdated] = useState(getNowString());
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+    const [metrics, setMetrics] = useState({
+        totalOrders: 0,
+        completed: 0,
+        atRisk: 0,
+        pending: 0,
+        missingParts: 0,
+    });
+
+    const fetchWorkOrders = async () => {
+        try {
+            setLoading(true);
+            const data = await api.get<WorkOrdersResponse>('/workorders/');
+            setWorkOrders(data.work_orders);
+            
+            // Calculate metrics
+            const totalOrders = data.work_orders?.length || 0;
+            const completed = data.work_orders?.filter(wo => wo.is_completed).length || 0;
+            const pending = data.work_orders?.filter(wo => !wo.is_completed).length || 0;
+            const atRisk = data.work_orders?.filter(wo => !wo.is_completed && wo.parts_missing > 0).length || 0;
+            const missingParts = data.work_orders?.filter(wo => wo.parts_missing > 0).length || 0;
+            
+            setMetrics({
+                totalOrders,
+                completed,
+                atRisk,
+                pending,
+                missingParts,
+            });
+            setLastUpdated(getNowString());
+            setError(null);
+        } catch (err) {
+            console.error('Error fetching work orders:', err);
+            setError('Failed to load work orders. Please try again later.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        setLastUpdated(getNowString())
-    }, [])
+        // Initial fetch
+        fetchWorkOrders();
+
+        // Set up auto-refresh
+        const interval = setInterval(fetchWorkOrders, 30000);
+
+        // Clean up interval on component unmount
+        return () => clearInterval(interval);
+    }, [api]);
+    
+    // Generate completion data for the last 7 days
+    const getCompletionsOverTime = () => {
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        return days.map(day => ({
+            date: day,
+            completed: Math.floor(Math.random() * 5), // Replace with actual data when available
+        }));
+    };
+    
+    const completionsOverTime = getCompletionsOverTime();
+    
+    const statusBreakdown = [
+        { name: 'Completed', value: metrics.completed },
+        { name: 'At Risk', value: metrics.atRisk },
+        { name: 'Pending', value: metrics.pending - metrics.atRisk },
+    ];
+    
+    const metricTrends = {
+        totalOrders: { trend: "up" as const, change: 0 },
+        completed: { trend: "up" as const, change: 0 },
+        atRisk: { trend: "down" as const, change: 0 },
+        pending: { trend: "up" as const, change: 0 },
+        missingParts: { trend: "down" as const, change: 0 },
+    };
+    
+    const metricSub = {
+        totalOrders: `${metrics.totalOrders} total`,
+        completed: metrics.totalOrders > 0 ? `${Math.round((metrics.completed / metrics.totalOrders) * 100)}% of total` : 'No data',
+        atRisk: metrics.atRisk > 0 ? `${metrics.atRisk} need attention` : 'All good',
+        pending: `${metrics.pending} in progress`,
+        missingParts: metrics.missingParts > 0 
+            ? `${metrics.missingParts} orders affected` 
+            : 'No missing parts',
+    };
+    if (loading) {
+        return (
+            <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-8 flex justify-center items-center">
+                <div className="flex flex-col items-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
+                    <p className="text-gray-600">Loading work orders...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-8">
+                <div className="bg-red-50 border-l-4 border-red-400 p-4">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <AlertCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-red-700">{error}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <LiveStatusBar lastUpdated={lastUpdated} />
             {/* Metric Cards Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
-                <MetricCard label="Total Orders" value={metrics.totalOrders} icon={<ClipboardIcon />} color="bg-blue-100 text-blue-800" trend={metricTrends.totalOrders.trend} change={metricTrends.totalOrders.change} subMetric={metricSub.totalOrders} />
-                <MetricCard label="Completed" value={metrics.completed} icon={<CheckCircle className="w-5 h-5" />} color="bg-green-100 text-green-800" trend={metricTrends.completed.trend} change={metricTrends.completed.change} subMetric={metricSub.completed} />
-                <MetricCard label="At Risk" value={metrics.atRisk} icon={<AlertTriangle className="w-5 h-5" />} color="bg-yellow-100 text-yellow-800" trend={metricTrends.atRisk.trend} change={metricTrends.atRisk.change} subMetric={metricSub.atRisk} />
-                <MetricCard label="Delayed" value={metrics.delayed} icon={<AlertTriangle className="w-5 h-5" />} color="bg-red-100 text-red-800" trend={metricTrends.delayed.trend} change={metricTrends.delayed.change} subMetric={metricSub.delayed} />
-                <MetricCard label="Missing Parts" value={metrics.missingParts} icon={<BarChart3 className="w-5 h-5" />} color="bg-orange-100 text-orange-800" trend={metricTrends.missingParts.trend} change={metricTrends.missingParts.change} subMetric={metricSub.missingParts} />
+                <MetricCard 
+                    label="Total Orders" 
+                    value={metrics.totalOrders} 
+                    icon={<ClipboardIcon />} 
+                    color="bg-blue-100 text-blue-800" 
+                    trend={metricTrends.totalOrders.trend} 
+                    change={metricTrends.totalOrders.change} 
+                    subMetric={metricSub.totalOrders} 
+                />
+                <MetricCard 
+                    label="Completed" 
+                    value={metrics.completed} 
+                    icon={<CheckCircle className="w-5 h-5" />} 
+                    color="bg-green-100 text-green-800" 
+                    trend={metricTrends.completed.trend} 
+                    change={metricTrends.completed.change} 
+                    subMetric={metricSub.completed} 
+                />
+                <MetricCard 
+                    label="At Risk" 
+                    value={metrics.atRisk} 
+                    icon={<AlertTriangle className="w-5 h-5" />} 
+                    color="bg-yellow-100 text-yellow-800" 
+                    trend={metricTrends.atRisk.trend} 
+                    change={metricTrends.atRisk.change} 
+                    subMetric={metricSub.atRisk} 
+                />
+                <MetricCard 
+                    label="Pending" 
+                    value={metrics.pending} 
+                    icon={<BarChart3 className="w-5 h-5" />} 
+                    color="bg-purple-100 text-purple-800" 
+                    trend={metricTrends.pending.trend} 
+                    change={metricTrends.pending.change} 
+                    subMetric={metricSub.pending} 
+                />
+                <MetricCard 
+                    label="Missing Parts" 
+                    value={metrics.missingParts} 
+                    icon={<AlertTriangle className="w-5 h-5" />} 
+                    color="bg-orange-100 text-orange-800" 
+                    trend={metricTrends.missingParts.trend} 
+                    change={metricTrends.missingParts.change} 
+                    subMetric={metricSub.missingParts} 
+                />
             </div>
 
             {/* Charts Row */}
@@ -118,14 +251,20 @@ export default function ProductionOverviewSection() {
             {/* Recent Activity Feed */}
             <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
                 <h4 className="font-semibold text-lg mb-4">Recent Activity</h4>
-                <ul className="divide-y divide-gray-200">
-                    {recentActivity.map((item, i) => (
-                        <li key={i} className="flex items-center justify-between py-2">
-                            <span className="text-sm text-gray-700"><span className="font-semibold text-blue-700">{item.user}</span> — {item.action}</span>
-                            <span className="text-xs text-gray-400 ml-4">{item.time}</span>
-                        </li>
-                    ))}
-                </ul>
+                {workOrders.length > 0 ? (
+                    <ul className="divide-y divide-gray-200">
+                        {getRecentActivity(workOrders).map((item, i) => (
+                            <li key={i} className="flex items-center justify-between py-2">
+                                <span className="text-sm text-gray-700">
+                                    <span className="font-semibold text-blue-700">{item.user}</span> — {item.action}
+                                </span>
+                                <span className="text-xs text-gray-400 ml-4">{item.time}</span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-sm text-gray-500">No recent activity to display</p>
+                )}
             </div>
             {/* Main Grid (as on landing page) */}
 
