@@ -232,16 +232,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = await api.get<{ data: User }>("/users/me");
         setUser(userData.data);
         setIsAuthenticated(true);
-
         // Start auto-refresh
         // TokenManager.startAutoRefresh(refreshToken);
       } else {
-        // No valid session, ensure we're logged out
-        await logout();
+        // No valid session, just update the state without redirecting
+        setUser(null);
+        setIsAuthenticated(false);
       }
     } catch (error) {
       console.error("Auth initialization failed:", error);
-      await logout();
+      // Don't redirect on error, just update the state
+      setUser(null);
+      setIsAuthenticated(false);
     } finally {
       setLoading(false);
     }
@@ -250,11 +252,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (token: string, userData: User) => {
       try {
+        // Store token in localStorage
         localStorage.setItem("authToken", token);
         localStorage.setItem("user", JSON.stringify(userData));
+        
+        // Also store token in a cookie for server-side access
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 7); // 7 days expiration
+        document.cookie = `authToken=${token}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+        
         setUser(userData);
         setIsAuthenticated(true);
-        // Removed router.push("/dashboard");
       } catch (error) {
         console.error("Login error:", error);
         setError("Failed to complete login");
@@ -273,13 +281,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   //   }
   // }, [api]);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (redirectToSignIn: boolean = true) => {
     try {
       console.log("Logging out...");
+      // Clear localStorage
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
+      
+      // Clear the auth cookie by setting it to expire in the past
+      document.cookie = 'authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      
       setUser(null);
       setIsAuthenticated(false);
       setError(null);
-      router.push("/signin");
+      
+      if (redirectToSignIn) {
+        router.push("/signin");
+      }
     } catch (error) {
       console.error("Logout error:", error);
     }

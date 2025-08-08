@@ -84,13 +84,13 @@ const sections = [
         content: <CommentsSection workOrderId={""} unitNumber={""} stationNumber={""} />,
         notificationCount: newCommentsCount,
     },
-    {
-        key: "partsRequests",
-        label: "Parts Requests",
-        icon: <Package className="w-5 h-5 mr-2" />,
-        content: <ReceivingInterfaceSection />,
-        notificationCount: 0,
-    },
+    // {
+    //     key: "partsRequests",
+    //     label: "Parts Requests",
+    //     icon: <Package className="w-5 h-5 mr-2" />,
+    //     content: <ReceivingInterfaceSection />,
+    //     notificationCount: 0,
+    // },
     {
         key: "missingParts",
         label: "Missing Parts",
