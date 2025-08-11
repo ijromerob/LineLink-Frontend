@@ -1,168 +1,192 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "../ui/button"
-import { Package, CheckCircle, Truck } from "lucide-react"
+import { Package, CheckCircle, Truck, Loader2 } from "lucide-react"
 import LiveStatusBar from "./LiveStatusBar"
-import { useAppDispatch, useAppSelector } from "@/store"
-import { fetchMissingParts, dispatchPart, updatePartStatus } from "@/store/missingPartsThunks"
+import { useApi } from "@/contexts/AuthContext"
 import toast from 'react-hot-toast';
+import { useAuth } from "@/contexts/AuthContext";
 
 const statusColors: Record<string, string> = {
-    Requested: "bg-yellow-100 text-yellow-800",
-    Dispatched: "bg-blue-100 text-blue-800",
-    Acknowledged: "bg-green-100 text-green-800",
-}
+    requested: "bg-yellow-100 text-yellow-800",
+    dispatched: "bg-blue-100 text-blue-800",
+    acknowledged: "bg-green-100 text-green-800",
+    default: "bg-gray-100 text-gray-800"
+};
 
 function getNowString() {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 interface MissingPart {
-    id: string;
     work_order: string;
     part_number: string;
     description: string;
-    quantity_required: string;
-    quantity_supplied: string;
-    status: string;
+    quantity_required: number;
+    quantity_supplied: number;
+    status: 'requested' | 'dispatched' | 'acknowledged';
 }
 
 export default function MissingPartsSection() {
-    const dispatch = useAppDispatch();
-    const { 
-        parts, 
-        loading, 
-        lastUpdated, 
-        error 
-    } = useAppSelector((state) => state.missingParts);
+    const api = useApi();
+    const { user } = useAuth();
     
-    const userRole = "warehouse" as "warehouse" | "production";
+    const [parts, setParts] = useState<MissingPart[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [lastUpdated, setLastUpdated] = useState(getNowString());
+    const [error, setError] = useState<string | null>(null);
+    const [dispatching, setDispatching] = useState<Record<string, boolean>>({});
+
+    // const userRole = user?.role === 'warehouse' ? 'warehouse' : 'production';
 
     // Fetch missing parts from the API
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                await dispatch(fetchMissingParts()).unwrap();
-            } catch (error) {
-                console.error("Failed to load missing parts:", error);
-                toast("Failed to load missing parts. Please try again later.");
-            }
-        };
-        
-        loadData();
-        // Set up polling every 30 seconds
-        const interval = setInterval(loadData, 30000);
-        return () => clearInterval(interval);
-    }, [dispatch, toast]);
+    const fetchMissingParts = async () => {
+        try {
+            setLoading(true);
+            const response = await api.get('/parts/needed_parts');
+            setParts(response.data || []);
+            setError(null);
+            setLastUpdated(getNowString());
+        } catch (err: any) {
+            console.error("Failed to load missing parts:", err);
+            setError(err.response?.data?.error || 'Failed to load missing parts');
+            toast.error('Failed to load missing parts. Please try again later.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    async function handleDispatch(id: string) {
-        const part = parts.find(p => p.id === id);
-        if (!part) return;
+    useEffect(() => {
+        fetchMissingParts();
+        // Set up polling every 30 seconds
+        const interval = setInterval(fetchMissingParts, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const handleDispatch = async (part: MissingPart) => {
+        const partKey = `${part.work_order}-${part.part_number}`;
         
         try {
-            // Optimistic update
-            dispatch(updatePartStatus(id, "Dispatched"));
+            setDispatching(prev => ({ ...prev, [partKey]: true }));
             
-            // Make the API call
-            await dispatch(dispatchPart({
-                id: part.id,
+            // Make the API call to dispatch parts
+            await api.post('/parts/dispatch', {
+                work_order_id: part.work_order,
+                station_number: 1, // This should come from the station context if available
                 part_number: part.part_number,
-                quantity_required: part.quantity_required,
-                work_order: part.work_order
-            })).unwrap();
+                quantity_supplied: part.quantity_required - part.quantity_supplied
+            });
             
-            // Show success message
-            toast("Part dispatched successfully!");
+            // Update local state optimistically
+            setParts(prev => prev.map(p => 
+                p.work_order === part.work_order && p.part_number === part.part_number
+                    ? { ...p, status: 'dispatched', quantity_supplied: p.quantity_required }
+                    : p
+            ));
             
-            // Refresh the data
-            await dispatch(fetchMissingParts()).unwrap();
+            toast.success('Parts dispatched successfully!');
             
-        } catch (error) {
-            console.error("Failed to dispatch part:", error);
-            // Revert optimistic update on error
-            dispatch(updatePartStatus(id, "Requested"));
-            
-            toast("Failed to dispatch part. Please try again.");
+        } catch (err: any) {
+            console.error('Failed to dispatch part:', err);
+            toast.error(err.response?.data?.error || 'Failed to dispatch parts');
+        } finally {
+            setDispatching(prev => ({ ...prev, [partKey]: false }));
         }
-    }
+    };
 
-    function handleAcknowledge(id: string) {
-        dispatch(updatePartStatus(id, "Acknowledged"));
-    }
+    const handleAcknowledge = async (part: MissingPart) => {
+        try {
+            // Update local state optimistically
+            setParts(prev => prev.map(p => 
+                p.work_order === part.work_order && p.part_number === part.part_number
+                    ? { ...p, status: 'acknowledged' }
+                    : p
+            ));
+            
+            // In a real app, you would make an API call here to update the status
+            toast.success('Parts acknowledged!');
+            
+        } catch (err) {
+            console.error('Failed to acknowledge parts:', err);
+            toast.error('Failed to acknowledge parts');
+        }
+    };
 
     return (
         <div className="overflow-x-auto">
             <LiveStatusBar lastUpdated={lastUpdated} />
             {error && <div className="text-red-500 mb-2">{error}</div>}
-            {loading && <div className="text-gray-500 mb-2">Loading...</div>}
-            <div className="flex flex-col lg:flex-row gap-6 min-w-[600px]">
+            <div className="flex flex-col gap-6 min-w-[600px]">
                 {/* Missing Parts Card */}
-                <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
-                    <h2 className="text-2xl font-bold mb-6 flex items-center">
-                        <Package className="w-6 h-6 mr-3" />Missing Parts Report
-                    </h2>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full text-base">
-                            <thead>
-                                <tr className="text-left text-gray-700 border-b">
-                                    <th className="py-3 px-4">Work Order</th>
-                                    <th className="py-3 px-4">Part #</th>
-                                    <th className="py-3 px-4">Description</th>
-                                    <th className="py-3 px-4">Required</th>
-                                    <th className="py-3 px-4">Supplied</th>
-                                    <th className="py-3 px-4">Status</th>
-                                    <th className="py-3 px-4">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {parts.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="py-4 text-center text-gray-500">
-                                            No missing parts reported
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    parts.map((part) => (
-                                        <tr key={part.id} className="border-b hover:bg-gray-50">
-                                            <td className="py-3 px-4 font-mono">{part.work_order}</td>
-                                            <td className="py-3 px-4 font-mono">{part.part_number}</td>
-                                            <td className="py-3 px-4">{part.description}</td>
-                                            <td className="py-3 px-4 text-right">{part.quantity_required}</td>
-                                            <td className="py-3 px-4 text-right">{part.quantity_supplied}</td>
-                                            <td className="py-3 px-4">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[part.status] || 'bg-gray-100 text-gray-800'}`}>
-                                                    {part.status}
+                <div className="bg-white rounded-xl shadow-lg p-8 flex-1">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold flex items-center">
+                            <Package className="w-6 h-6 mr-3" />
+                            Missing Parts
+                        </h2>
+                        <div className="text-sm text-gray-500">
+                            Last updated: {lastUpdated}
+                        </div>
+                    </div>
+                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                        {loading ? (
+                            <div className="flex justify-center items-center h-20">
+                                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                            </div>
+                        ) : parts.length === 0 ? (
+                            <div className="text-gray-500 text-center py-4">
+                                No missing parts at the moment
+                            </div>
+                        ) : (
+                            parts.map((part) => (
+                                <div key={`${part.work_order}-${part.part_number}`} className="border rounded-lg p-4">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-medium">{part.description}</h3>
+                                            <p className="text-sm text-gray-600">
+                                                {part.part_number} • WO: {part.work_order}
+                                            </p>
+                                            <div className="mt-2">
+                                                <span className="text-sm">
+                                                    Needed: {part.quantity_required} • 
+                                                    Supplied: {part.quantity_supplied} • 
+                                                    Missing: {part.quantity_required - part.quantity_supplied}
                                                 </span>
-                                            </td>
-                                            <td className="py-3 px-4">
-                                                {userRole === 'warehouse' ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={loading || part.status === 'Dispatched'}
-                                                        onClick={() => handleDispatch(part.id)}
-                                                        className="text-xs"
-                                                    >
-                                                        <Truck className="w-4 h-4 mr-1" />
-                                                        {part.status === 'Dispatched' ? 'Dispatched' : 'Mark as Dispatched'}
-                                                    </Button>
+                                            </div>
+                                        </div>
+                                        <span className={`text-xs px-2 py-1 rounded-full ${statusColors[part.status] || statusColors.default}`}>
+                                            {part.status}
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 flex justify-end gap-2">
+                                        {part.quantity_supplied < part.quantity_required && (
+                                            <Button 
+                                                size="sm" 
+                                                variant="outline"
+                                                onClick={() => handleDispatch(part)}
+                                                disabled={dispatching[`${part.work_order}-${part.part_number}`]}
+                                            >
+                                                {dispatching[`${part.work_order}-${part.part_number}`] ? (
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                                 ) : (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={part.status === 'Acknowledged'}
-                                                        onClick={() => handleAcknowledge(part.id)}
-                                                        className="text-xs"
-                                                    >
-                                                        <CheckCircle className="w-4 h-4 mr-1" />
-                                                        {part.status === 'Acknowledged' ? 'Acknowledged' : 'Acknowledge'}
-                                                    </Button>
+                                                    <Truck className="mr-2 h-4 w-4" />
                                                 )}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                                                Dispatch
+                                            </Button>
+                                        )}
+                                        {part.status === 'dispatched' && (
+                                            <Button 
+                                                size="sm" 
+                                                variant="outline"
+                                                onClick={() => handleAcknowledge(part)}
+                                            >
+                                                <CheckCircle className="mr-2 h-4 w-4" />
+                                                Acknowledge
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             </div>

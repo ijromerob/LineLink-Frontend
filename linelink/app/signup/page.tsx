@@ -494,7 +494,7 @@ export default function SignUp() {
                 )}
               </div>
 
-              <div>
+              {/* <div>
                 <label
                   htmlFor="accountType"
                   className="block text-sm font-medium text-gray-700 mb-1"
@@ -513,7 +513,7 @@ export default function SignUp() {
                   <option value="personal">Personal</option>
                   <option value="enterprise">Enterprise</option>
                 </select>
-              </div>
+              </div> */}
 
               <div>
                 <label

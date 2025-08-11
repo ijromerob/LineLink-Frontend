@@ -2,12 +2,14 @@ import { useState, useEffect } from "react"
 import LiveStatusBar from "./LiveStatusBar"
 import { MessageCircle, Loader2 } from "lucide-react"
 import { useApi } from "@/contexts/AuthContext"
+import toast from 'react-hot-toast';
 
 interface Comment {
-  id: string;
+  id?: string;
   user: string;
   text: string;
-  created_at: string;
+  created_at?: string;
+  timestamp?: string;
 }
 
 interface CommentsSectionProps {
@@ -31,10 +33,30 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
   const fetchComments = async () => {
     try {
       setLoading(true);
-      const response = await api.get<{ comments: Comment[] }>(
-        `/workorders/${workOrderId}/units/${unitNumber}/stations/${stationNumber}/comments`
-      );
-      setComments(response.comments || []);
+      // Fetch the work order details which includes station comments
+      const response = await api.get(`/workorders/${workOrderId}`);
+      
+      if (response && response.units) {
+        // Find the specific unit and station
+        const unit = response.units.find((u: any) => u.unit_number === unitNumber);
+        if (unit) {
+          const station = unit.stations.find((s: any) => s.station_number === stationNumber);
+          if (station && station.station_comments) {
+            // Format the comment to match our interface
+            const formattedComment: Comment = {
+              user: 'Operator',
+              text: station.station_comments,
+              timestamp: station.updated_at || new Date().toISOString()
+            };
+            setComments([formattedComment]);
+          } else {
+            setComments([]);
+          }
+        } else {
+          setComments([]);
+        }
+      }
+      
       setLastUpdated(getNowString());
       setError(null);
     } catch (err) {
@@ -55,17 +77,23 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
     
     try {
       setLoading(true);
+      
+      // Update the station comment via the API
       await api.put(
         `/workorders/${workOrderId}/units/${unitNumber}/stations/${stationNumber}/comment`,
-        { text: comment }
+        { comment: comment.trim() }
       );
       
       // Refresh comments after successful submission
       await fetchComments();
       setComment("");
+      
+      // Show success message
+      toast.success('Comment updated successfully');
     } catch (err) {
       console.error('Error adding comment:', err);
-      setError('Failed to add comment. Please try again.');
+      setError('Failed to update comment. Please try again.');
+      toast.error('Failed to update comment');
     } finally {
       setLoading(false);
     }
@@ -90,12 +118,14 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
             ) : comments.length === 0 ? (
               <div className="text-gray-400 text-base">No comments yet.</div>
             ) : (
-              comments.map((c) => (
-                <div key={c.id} className="bg-gray-50 rounded px-4 py-3 text-base flex items-center justify-between">
+              comments.map((c, index) => (
+                <div key={c.id || `comment-${index}`} className="bg-gray-50 rounded px-4 py-3 text-base flex items-center justify-between">
                   <span><span className="font-semibold text-gray-700">{c.user}:</span> {c.text}</span>
-                  <span className="text-xs text-gray-400 ml-2">
-                    {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  {c.timestamp && (
+                    <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">
+                      {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
                 </div>
               ))
             )}
@@ -111,7 +141,7 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
             />
             <button 
               type="submit" 
-              className="bg-blue-600 text-white px-4 py-2 rounded text-base flex items-center gap-2 disabled:bg-blue-400"
+              className="flex items-center gap-2 border-2 border-blue-600 bg-transparent hover:bg-blue-600 text-blue-600 hover:text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading || !comment.trim()}
             >
               {loading ? (
@@ -119,7 +149,12 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Sending...
                 </>
-              ) : 'Send'}
+              ) : (
+                <span className="flex items-center">
+                  <MessageCircle className="w-4 h-4 mr-1" />
+                  Send
+                </span>
+              )}
             </button>
           </form>
         </div>

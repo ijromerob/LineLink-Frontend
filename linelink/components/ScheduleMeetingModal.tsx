@@ -1,12 +1,14 @@
 import React, { useState } from 'react'
 
 interface ScheduleMeetingModalProps {
-    onClose: () => void
-    onSchedule: (start: string, end: string, summary: string, description: string) => void
-    loading: boolean
+    isOpen: boolean;
+    onClose: () => void;
+    onSchedule: (start: string, end: string, summary: string, description: string) => void;
+    loading: boolean;
 }
 
-export default function ScheduleMeetingModal({ onClose, onSchedule, loading }: ScheduleMeetingModalProps) {
+export default function ScheduleMeetingModal({ isOpen, onClose, onSchedule, loading }: ScheduleMeetingModalProps) {
+    if (!isOpen) return null;
     const [date, setDate] = useState('')
     const [startTime, setStartTime] = useState('')
     const [endTime, setEndTime] = useState('')

@@ -7,8 +7,7 @@ import { format, subDays } from 'date-fns'
 import { toast } from 'react-hot-toast'
 import { Button } from "../ui/button"
 import { useApi } from "@/contexts/AuthContext"
-import LiveStatusBar from "./LiveStatusBar"
-import { useState, useEffect } from "react"
+import { useState, useEffect } from 'react'
 
 interface WorkOrder {
     id: string;
@@ -39,69 +38,7 @@ const COLORS = {
     inProgress: '#3b82f6',
     defects: '#ef4444',
     efficiency: '#8b5cf6'
-}
-
-function MetricCard({ 
-    label, 
-    value, 
-    icon, 
-    color, 
-    trend, 
-    change, 
-    subMetric 
-}: { 
-    label: string; 
-    value: string | number; 
-    icon: React.ReactNode; 
-    color: string; 
-    trend?: "up" | "down"; 
-    change?: number; 
-    subMetric?: string; 
-}) {
-    return (
-        <div className="flex items-center gap-2 p-3 bg-white rounded-lg shadow">
-            <div className={`p-2 rounded-full ${color} bg-opacity-20`}>
-                {icon}
-            </div>
-            <div>
-                <div className="text-sm text-gray-500">{label}</div>
-                <div className="flex items-center gap-2">
-                    <div className="text-lg font-semibold">{value}</div>
-                    {trend && change !== undefined && (
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                            trend === 'up' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                            {trend === 'up' ? '↑' : '↓'} {change}%
-                        </span>
-                    )}
-                </div>
-                {subMetric && (
-                    <div className="text-xs text-gray-500">{subMetric}</div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-function ClipboardIcon() {
-    return (
-        <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-            className="w-5 h-5"
-        >
-            <rect x="8" y="4" width="12" height="16" rx="2" ry="2" />
-            <path d="M16 2v2a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V2z" />
-        </svg>
-    );
-}
+};
 
 const getNowString = () => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -131,9 +68,54 @@ const getRecentActivity = (workOrders: WorkOrder[]) => {
         });
 };
 
+function MetricCard({ 
+    label, 
+    value, 
+    icon, 
+    color, 
+    trend, 
+    change, 
+    subMetric 
+}: { 
+    label: string; 
+    value: string | number; 
+    icon: React.ReactNode; 
+    color: string; 
+    trend?: "up" | "down"; 
+    change?: number; 
+    subMetric?: string;
+}) {
+    return (
+        <div className="bg-white p-4 rounded-lg shadow">
+            <div className="flex items-center justify-between">
+                <div className={`p-2 rounded-full ${color} bg-opacity-20`}>
+                    {icon}
+                </div>
+                <div className="text-right">
+                    <p className="text-sm text-gray-500">{label}</p>
+                    <p className="text-2xl font-bold">{value}</p>
+                    {subMetric && <p className="text-xs text-gray-500">{subMetric}</p>}
+                </div>
+            </div>
+            {trend && change !== undefined && (
+                <div className={`mt-2 text-sm ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                    {trend === 'up' ? '↑' : '↓'} {change}% from last period
+                </div>
+            )}
+        </div>
+    );
+}
+
+function ClipboardIcon() {
+    return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+    );
+}
+
 export default function ProductionOverviewSection() {
     const api = useApi();
-    const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | 'custom'>('30d');
     const [lastUpdated, setLastUpdated] = useState(getNowString());
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -144,122 +126,36 @@ export default function ProductionOverviewSection() {
         to: new Date(),
     });
     const [activeChart, setActiveChart] = useState<'production' | 'defects' | 'efficiency'>('production');
+    const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | 'custom'>('30d');
     
-    // Key metrics state
-    const [metrics, setMetrics] = useState({
-        totalOrders: 0,
-        completed: 0,
-        inProgress: 0,
-        defectRate: '0',
-        avgEfficiency: '0'
-    });
-
-    // Update metrics when workOrders or reportData changes
-    useEffect(() => {
-        setMetrics({
-            totalOrders: workOrders.length,
-            completed: workOrders.filter(wo => wo.is_completed).length,
-            inProgress: workOrders.filter(wo => !wo.is_completed).length,
-            defectRate: reportData.length > 0 
-                ? (reportData.reduce((sum, day) => sum + day.defects, 0) / 
-                   (reportData.reduce((sum, day) => sum + day.completed + day.inProgress, 0) || 1) * 100).toFixed(1)
-                : '0',
-            avgEfficiency: reportData.length > 0 
-                ? (reportData.reduce((sum, day) => sum + day.efficiency, 0) / reportData.length).toFixed(1)
-                : '0'
-        });
-    }, [workOrders, reportData]);
+    // Key metrics
+    const metrics = {
+        totalOrders: workOrders.length,
+        completed: workOrders.filter(wo => wo.is_completed).length,
+        inProgress: workOrders.filter(wo => !wo.is_completed).length,
+        defectRate: reportData.length > 0 
+            ? (reportData.reduce((sum, day) => sum + day.defects, 0) / 
+               (reportData.reduce((sum, day) => sum + day.completed + day.inProgress, 0) || 1) * 100).toFixed(1)
+            : 0,
+        avgEfficiency: reportData.length > 0 
+            ? (reportData.reduce((sum, day) => sum + day.efficiency, 0) / reportData.length).toFixed(1)
+            : 0
+    };
 
     const fetchWorkOrders = async () => {
         try {
             setLoading(true);
             const response = await api.get<WorkOrdersResponse>('/workorders/');
-            
-            // Handle array of arrays structure
-            let workOrdersData: WorkOrder[] = [];
-            
-            if (Array.isArray(response?.work_orders)) {
-                // Flatten the array of arrays into a single array of work orders
-                workOrdersData = response.work_orders.flat();
-                
-                // If it wasn't an array of arrays, try to use it directly
-                if (workOrdersData.length === 0 && response.work_orders.length > 0) {
-                    workOrdersData = response.work_orders as unknown as WorkOrder[];
-                }
-            }
-            
-            // Filter out any null/undefined values that might have been in the arrays
-            workOrdersData = workOrdersData.filter(Boolean);
-            
+            const workOrdersData = Array.isArray(response?.work_orders) 
+                ? response.work_orders.flat().filter(Boolean) 
+                : [];
             setWorkOrders(workOrdersData);
-            
-            // Group by work_order_id to get unique work orders
-            const workOrdersMap = new Map();
-            workOrdersData.forEach(wo => {
-                if (!workOrdersMap.has(wo.work_order_id)) {
-                    workOrdersMap.set(wo.work_order_id, {
-                        ...wo,
-                        // If any item in the work order is not completed, mark the whole work order as not completed
-                        is_completed: workOrdersData.every(item => 
-                            item.work_order_id === wo.work_order_id ? item.is_completed : true
-                        )
-                    });
-                }
-            });
-            
-            const uniqueWorkOrders = Array.from(workOrdersMap.values());
-            setWorkOrders(uniqueWorkOrders);
-            
-            setLastUpdated(getNowString());
-            setError(null);
         } catch (err) {
             console.error('Error fetching work orders:', err);
-            setError('Failed to load work orders. Please try again later.');
-            // Reset metrics on error
-            setMetrics({
-                totalOrders: 0,
-                completed: 0,
-                inProgress: 0,
-                defectRate: '0',
-                avgEfficiency: '0'
-            });
-            setWorkOrders([]);
+            setError('Failed to load work orders');
+            toast.error('Failed to load work orders');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const generateMockData = (): ReportData[] => {
-        const data: ReportData[] = [];
-        const today = new Date();
-        const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
-        
-        for (let i = days - 1; i >= 0; i--) {
-            const date = subDays(today, i);
-            const completed = Math.floor(Math.random() * 20) + 5;
-            const inProgress = Math.floor(Math.random() * 15) + 3;
-            const defects = Math.floor(Math.random() * 5);
-            
-            data.push({
-                date: format(date, 'MMM dd'),
-                completed,
-                inProgress,
-                defects,
-                efficiency: Math.min(100, Math.floor((completed / (completed + inProgress + defects)) * 100))
-            });
-        }
-        
-        return data;
-    };
-
-    const handleExport = async (format: 'csv' | 'pdf' | 'excel') => {
-        try {
-            toast.success(`Exporting data as ${format.toUpperCase()}...`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            toast.success('Export completed!');
-        } catch (error) {
-            console.error('Export failed:', error);
-            toast.error('Export failed. Please try again.');
         }
     };
 
@@ -281,22 +177,39 @@ export default function ProductionOverviewSection() {
         }
     };
 
-    useEffect(() => {
-        const fetchData = async () => {
-            await fetchWorkOrders();
-            await fetchReportData();
-        };
-
-        fetchData();
+    const generateMockData = (): ReportData[] => {
+        const data: ReportData[] = [];
+        const today = new Date();
+        const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
         
-        const interval = setInterval(() => {
-            fetchWorkOrders();
-            fetchReportData();
-            setLastUpdated(getNowString());
-        }, 30000);
+        for (let i = days - 1; i >= 0; i--) {
+            const date = subDays(today, i);
+            const completed = Math.floor(Math.random() * 20) + 5;
+            const inProgress = Math.floor(Math.random() * 15) + 3;
+            const defects = Math.floor(Math.random() * 5);
+            
+            data.push({
+                date: format(date, 'MMM dd'),
+                completed,
+                inProgress,
+                defects,
+                efficiency: Math.min(100, Math.floor((completed / (completed + inProgress + defects || 1)) * 100))
+            });
+        }
+        
+        return data;
+    };
 
-        return () => clearInterval(interval);
-    }, [timeRange, dateRange]);
+    const handleExport = async (format: 'csv' | 'pdf' | 'excel') => {
+        try {
+            toast.success(`Exporting data as ${format.toUpperCase()}...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            toast.success('Export completed!');
+        } catch (error) {
+            console.error('Export failed:', error);
+            toast.error('Export failed. Please try again.');
+        }
+    };
 
     const renderChart = () => {
         if (loading) {
@@ -327,7 +240,6 @@ export default function ProductionOverviewSection() {
                             <Legend />
                             <Bar dataKey="completed" name="Completed" fill={COLORS.completed} />
                             <Bar dataKey="inProgress" name="In Progress" fill={COLORS.inProgress} />
-                            <Bar dataKey="defects" name="Defects" fill={COLORS.defects} />
                         </BarChart>
                     ) : activeChart === 'defects' ? (
                         <LineChart data={reportData}>
@@ -349,7 +261,7 @@ export default function ProductionOverviewSection() {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="date" />
                             <YAxis domain={[0, 100]} />
-                            <Tooltip formatter={(value: number) => [`${value}%`, 'Efficiency']} />
+                            <Tooltip formatter={(value) => [`${value}%`, 'Efficiency']} />
                             <Legend />
                             <Line 
                                 type="monotone" 
@@ -365,10 +277,25 @@ export default function ProductionOverviewSection() {
         );
     };
 
-    // Get recent activities
-    const recentActivities = getRecentActivity(workOrders);
+    useEffect(() => {
+        const fetchData = async () => {
+            await Promise.all([
+                fetchWorkOrders(),
+                fetchReportData()
+            ]);
+            setLastUpdated(getNowString());
+        };
 
-    if (loading) {
+        fetchData();
+        
+        const interval = setInterval(() => {
+            fetchData();
+        }, 30000);
+
+        return () => clearInterval(interval);
+    }, [timeRange, dateRange]);
+
+    if (loading && workOrders.length === 0) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -441,27 +368,27 @@ export default function ProductionOverviewSection() {
                     label="Total Orders" 
                     value={metrics.totalOrders} 
                     icon={<ClipboardIcon />} 
-                    color="bg-blue-100 text-blue-700"
+                    color="text-blue-600"
                 />
                 <MetricCard 
                     label="Completed" 
                     value={metrics.completed} 
                     icon={<CheckCircle className="w-5 h-5" />} 
-                    color="bg-green-100 text-green-700"
-                    trend={metrics.completed > 0 ? "up" : undefined}
+                    color="text-green-600"
+                    trend="up"
                     change={5}
                 />
                 <MetricCard 
                     label="In Progress" 
                     value={metrics.inProgress} 
                     icon={<AlertTriangle className="w-5 h-5" />} 
-                    color="bg-yellow-100 text-yellow-700"
+                    color="text-yellow-600"
                 />
                 <MetricCard 
                     label="Avg. Efficiency" 
                     value={`${metrics.avgEfficiency}%`} 
                     icon={<BarChart2 className="w-5 h-5" />} 
-                    color="bg-purple-100 text-purple-700"
+                    color="text-purple-600"
                     subMetric={`${metrics.defectRate}% defect rate`}
                 />
             </div>
@@ -519,8 +446,8 @@ export default function ProductionOverviewSection() {
                     </Button>
                 </div>
                 <div className="space-y-4">
-                    {recentActivities.length > 0 ? (
-                        recentActivities.map((activity, index) => (
+                    {getRecentActivity(workOrders).length > 0 ? (
+                        getRecentActivity(workOrders).map((activity, index) => (
                             <div key={index} className="flex items-start pb-4 border-b border-gray-100 last:border-0 last:pb-0">
                                 <div className="bg-gray-100 p-2 rounded-full mr-3">
                                     {activity.action.includes('Completed') ? (

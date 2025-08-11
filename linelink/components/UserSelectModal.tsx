@@ -7,15 +7,23 @@ const mockUsers = [
     { id: 4, name: "Diana", email: "diana@company.com" },
 ]
 
+interface User {
+    id: number;
+    name: string;
+    email: string;
+}
+
 interface UserSelectModalProps {
+    isOpen: boolean;
     onSelect: (email: string) => void
     onClose: () => void
     loading?: boolean
 }
 
-export default function UserSelectModal({ onSelect, onClose, loading }: UserSelectModalProps) {
+export default function UserSelectModal({ isOpen, onSelect, onClose, loading }: UserSelectModalProps) {
+    if (!isOpen) return null;
     const [search, setSearch] = useState('')
-    const filtered = mockUsers.filter(u =>
+    const filtered = mockUsers.filter((u: User) =>
         u.name.toLowerCase().includes(search.toLowerCase()) ||
         u.email.toLowerCase().includes(search.toLowerCase())
     )

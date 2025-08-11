@@ -1,14 +1,12 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { Monitor, BarChart3, Users, Shield, AlertTriangle, CheckCircle, MessageCircle, Package, Truck, ClipboardList, Key, History, ListChecks, Clock, XCircle, Menu, X, CalendarPlus, Video, Bell } from "lucide-react"
+import { Monitor, BarChart3, Users, Shield, AlertTriangle, CheckCircle, MessageCircle, Package, Truck, ClipboardList, Key, History, ListChecks, Clock, XCircle, Menu, X, CalendarPlus, Video, FileText } from "lucide-react"
 import { Button } from "../../components/ui/button"
 import WorkOrdersSection from "../../components/dashboard/WorkOrdersSection"
 import DashboardSidebar from "../../components/dashboard/DashboardSidebar"
 import MissingPartsSection from "../../components/dashboard/MissingPartsSection"
 import HistoricalDataSection from "../../components/dashboard/HistoricalDataSection"
-import AuditTrailSection from "../../components/dashboard/AuditTrailSection"
-import ReceivingInterfaceSection from "../../components/dashboard/ReceivingInterfaceSection"
 import ProductionOverviewSection from "../../components/dashboard/ProductionOverviewSection"
 import CommentsSection from "../../components/dashboard/CommentsSection"
 import ScheduleMeetingModal from "../../components/ScheduleMeetingModal"
@@ -16,6 +14,7 @@ import UserSelectModal from "../../components/UserSelectModal"
 import CalendarSidebar from "../../components/dashboard/CalendarSidebar"
 import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
+import StationStatusUpdate from "@/components/dashboard/StationStatusUpdate"
 
 // Mock data for missing parts (should match MissingPartsSection)
 const mockMissingParts = [
@@ -54,13 +53,6 @@ const missingPartsNotificationCount = mockMissingParts.filter(p => p.status === 
 const failedWorkOrdersCount = 1 // e.g., number of failed work orders
 const newCommentsCount = 2 // e.g., number of new/unread comments
 
-// Notification mock data
-const mockNotifications = [
-    { id: 1, section: "workOrders", message: "Work Order WO-001 failed.", timestamp: "10:00", read: false },
-    { id: 2, section: "comments", message: "New comment on WO-002.", timestamp: "10:05", read: false },
-    { id: 3, section: "missingParts", message: "Part #555 is missing.", timestamp: "10:10", read: false },
-    { id: 4, section: "workOrders", message: "Work Order WO-003 completed.", timestamp: "10:15", read: true },
-]
 
 const sections = [
     {
@@ -84,13 +76,13 @@ const sections = [
         content: <CommentsSection workOrderId={""} unitNumber={""} stationNumber={""} />,
         notificationCount: newCommentsCount,
     },
-    // {
-    //     key: "partsRequests",
-    //     label: "Parts Requests",
-    //     icon: <Package className="w-5 h-5 mr-2" />,
-    //     content: <ReceivingInterfaceSection />,
-    //     notificationCount: 0,
-    // },
+    {
+        key: "station",
+        label: "Station Status",
+        icon: <Package className="w-5 h-5 mr-2" />,
+        content: <StationStatusUpdate stationNumber={""} onStatusUpdate={() => {}} />,
+        notificationCount: 0,
+    },
     {
         key: "missingParts",
         label: "Missing Parts",
@@ -166,7 +158,6 @@ export default function Dashboard() {
     const [meetingType, setMeetingType] = useState<'instant' | 'scheduled' | null>(null)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
     const [meetings, setMeetings] = useState<Array<{ title: string; start: string; end: string }>>([])
-    const [notifications, setNotifications] = useState(mockNotifications)
     const [notifModalOpen, setNotifModalOpen] = useState(false)
     const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
 
@@ -319,14 +310,6 @@ export default function Dashboard() {
         }, 2000)
     }
 
-    // Calculate total unread notifications
-    const totalUnread = notifications.filter(n => !n.read).length
-    // Calculate per-section notification counts
-    const sectionNotifCounts = sections.reduce((acc, s) => {
-        acc[s.key] = notifications.filter(n => n.section === s.key && !n.read).length
-        return acc
-    }, {} as Record<string, number>)
-
     const selectedSection = sections.find((s) => s.key === selected)
 
     return (
@@ -343,55 +326,6 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="flex items-center space-x-3">
-                {/* Notification Icon */}
-                {/* In the header, wrap the notification icon in a relative div for dropdown positioning */}
-                <div className="relative">
-                  <button
-                    className="relative"
-                    onClick={() => setNotifModalOpen((v) => !v)}
-                    aria-label="Notifications"
-                  >
-                    <Bell className="w-6 h-6 text-gray-700" />
-                    {notifications.length > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
-                        {notifications.length}
-                      </span>
-                    )}
-                  </button>
-                  {/* Notification Dropdown Modal */}
-                  {notifModalOpen && (
-                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl z-50 border animate-fade-in">
-                      <div className="p-4">
-                        <h3 className="font-bold text-lg mb-2">
-                          Notifications
-                        </h3>
-                        <ul className="divide-y divide-gray-200 max-h-64 overflow-y-auto mb-4">
-                          {notifications.length > 0 ? (
-                            notifications.map((n) => (
-                              <li key={n.id} className="py-2 flex flex-col">
-                                <span className="text-gray-800 text-sm">
-                                  {n.message}
-                                </span>
-                                <span className="text-xs text-gray-400 mt-1">
-                                  {n.timestamp}
-                                </span>
-                              </li>
-                            ))
-                          ) : (
-                            <li className="py-2 text-gray-400 text-sm">
-                              No notifications.
-                            </li>
-                          )}
-                        </ul>
-                        <Link href="/notifications">
-                          <button className="w-full bg-blue-600 text-white rounded px-4 py-2">
-                            See more
-                          </button>
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-                </div>
                 {/* Start Call Dropdown */}
                 <div className="relative">
                   <Button
@@ -455,8 +389,8 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-lg font-bold text-blue-700 border-2 border-white shadow-sm">
-                      {`${user?.first_name?.[0] || ""}${
-                        user?.last_name?.[0] || ""
+                      {`${user?.first_name?.[0]?.toUpperCase() || ""}${
+                        user?.last_name?.[0]?.toUpperCase() || ""
                       }`}
                     </div>
                   </button>
@@ -501,6 +435,7 @@ export default function Dashboard() {
         {/* User Select Modal for both meeting types */}
         {userSelectOpen && (
           <UserSelectModal
+            isOpen={userSelectOpen}
             onSelect={(email) => {
               setUserSelectOpen(false);
               setSelectedUserEmail(email);
@@ -550,13 +485,14 @@ export default function Dashboard() {
           <>
             {console.log("Rendering ScheduleMeetingModal")}
             <ScheduleMeetingModal
-              onClose={() => setScheduleModalOpen(false)}
-              onSchedule={(...args) => {
-                console.log("onSchedule called", args);
-                handleScheduleMeeting(...args);
-              }}
-              loading={loading}
-            />
+  isOpen={scheduleModalOpen}
+  onClose={() => setScheduleModalOpen(false)}
+  onSchedule={(...args) => {
+    console.log("onSchedule called", args);
+    handleScheduleMeeting(...args);
+  }}
+  loading={loading}
+/>
           </>
         )}
         {/* Success Modal */}
@@ -571,28 +507,6 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-        {/* Notification Modal */}
-        {/* This block is now redundant as notifications are in a dropdown */}
-        {/* <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 relative animate-fade-in">
-                    <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" onClick={() => setNotifModalOpen(false)} aria-label="Close">✕</button>
-                    <h3 className="font-bold text-2xl mb-4">Notifications</h3>
-                    <ul className="divide-y divide-gray-200 mb-4">
-                        {notifications.filter(n => !n.read).slice(0, 3).map(n => (
-                            <li key={n.id} className="py-2 flex flex-col">
-                                <span className="text-gray-800 text-sm">{n.message}</span>
-                                <span className="text-xs text-gray-400 mt-1">{n.timestamp}</span>
-                            </li>
-                        ))}
-                        {notifications.filter(n => !n.read).length === 0 && (
-                            <li className="py-2 text-gray-400 text-sm">No new notifications.</li>
-                        )}
-                    </ul>
-                    <Link href="/notifications">
-                        <button className="w-full bg-blue-600 text-white rounded px-4 py-2">See more</button>
-                    </Link>
-                </div>
-            </div> */}
         <div className="flex flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Sidebar */}
           <div
@@ -605,7 +519,6 @@ export default function Dashboard() {
               setSelected={setSelected}
               sidebarOpen={sidebarOpen}
               setSidebarOpen={setSidebarOpen}
-              sectionNotifCounts={sectionNotifCounts}
             />
             {meetings.length > 0 && (
               <div className="mt-4">
