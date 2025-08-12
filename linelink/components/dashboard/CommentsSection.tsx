@@ -158,16 +158,14 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
   // Show loading state if work order ID is missing
   if (!workOrderId) {
     return (
-      <div className="overflow-x-auto">
-        <div className="flex flex-col lg:flex-row gap-6 min-w-[600px]">
-          <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
-            <h2 className="text-2xl font-bold mb-6 flex items-center">
-              <MessageCircle className="w-6 h-6 mr-3" />
-              Comments & Issues
-            </h2>
-            <div className="text-amber-600 text-sm p-2 bg-amber-50 rounded">
-              Please select a work order to view or add comments
-            </div>
+      <div className="w-full">
+        <div className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 w-full">
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center">
+            <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
+            Comments & Issues
+          </h2>
+          <div className="text-amber-600 text-sm p-3 bg-amber-50 rounded-lg">
+            Please select a work order to view or add comments
           </div>
         </div>
       </div>
@@ -175,75 +173,86 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
   }
 
   return (
-    <div className="overflow-x-auto">
-      <LiveStatusBar lastUpdated={lastUpdated} />
-      <div className="flex flex-col lg:flex-row gap-6 min-w-[600px]">
-        {/* Comments Card */}
-        <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
-          <h2 className="text-2xl font-bold mb-6 flex items-center">
-            <MessageCircle className="w-6 h-6 mr-3" />
-            Comments & Issues
-          </h2>
-          <div className="space-y-3 max-h-60 overflow-y-auto mb-6">
+    <div className="w-full">
+      <LiveStatusBar lastUpdated={lastUpdated} className="mb-4" />
+      <div className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 w-full">
+        <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center">
+          <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
+          Comments & Issues
+        </h2>
+        <div className="space-y-3 max-h-80 sm:max-h-96 overflow-y-auto mb-4 sm:mb-6 pr-2 -mr-2">
             {loading && !comments.length ? (
               <div className="flex justify-center items-center h-20">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin text-blue-600" />
               </div>
             ) : error ? (
-              <div className="text-red-500 text-sm p-2 bg-red-50 rounded">
-                {error}
-                <button 
-                  onClick={fetchComments}
-                  className="ml-2 text-blue-600 hover:text-blue-800 underline"
-                  disabled={loading}
-                >
-                  Retry
-                </button>
+              <div className="text-red-500 text-sm p-3 bg-red-50 rounded-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <span>{error}</span>
+                  <button 
+                    onClick={fetchComments}
+                    className="text-blue-600 hover:text-blue-800 underline text-left sm:ml-2"
+                    disabled={loading}
+                  >
+                    Retry
+                  </button>
+                </div>
               </div>
             ) : comments.length === 0 ? (
-              <div className="text-gray-400 text-base">No comments yet.</div>
+              <div className="text-gray-400 text-sm sm:text-base text-center py-4">No comments yet. Be the first to add one!</div>
             ) : (
-              comments.map((c, index) => (
-                <div key={c.id || `comment-${index}`} className="bg-gray-50 rounded px-4 py-3 text-base flex items-center justify-between">
-                  <span><span className="font-semibold text-gray-700">{c.user}:</span> {c.text}</span>
-                  {c.timestamp && (
-                    <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">
-                      {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
-                </div>
-              ))
+              <div className="space-y-3">
+                {comments.map((c, index) => (
+                  <div 
+                    key={c.id || `comment-${index}`} 
+                    className="bg-gray-50 rounded-lg p-3 text-sm sm:text-base flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                  >
+                    <div className="break-words flex-1">
+                      <span className="font-semibold text-gray-700">{c.user}:</span>{' '}
+                      <span className="text-gray-800">{c.text}</span>
+                    </div>
+                    {c.timestamp && (
+                      <span className="text-xs text-gray-400 whitespace-nowrap self-end sm:self-auto">
+                        {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-          <form className="flex gap-3" onSubmit={handleAddComment}>
-            <input
-              type="text"
-              className="flex-1 border rounded px-3 py-2 text-base disabled:bg-gray-100"
-              placeholder="Add a comment..."
-              value={comment}
-              onChange={e => setComment(e.target.value)}
-              disabled={loading}
-            />
+          <form className="flex flex-col sm:flex-row gap-3 mt-4" onSubmit={handleAddComment}>
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 sm:py-2.5 text-sm sm:text-base disabled:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                placeholder="Type your comment here..."
+                value={comment}
+                onChange={e => setComment(e.target.value)}
+                disabled={loading}
+                aria-label="Add a comment"
+              />
+            </div>
             <button 
               type="submit" 
-              className="flex items-center gap-2 border-2 border-blue-600 bg-transparent hover:bg-blue-600 text-blue-600 hover:text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 border-2 border-blue-600 bg-transparent hover:bg-blue-600 text-blue-600 hover:text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               disabled={loading || !comment.trim()}
             >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Sending...
+                  <span className="hidden sm:inline">Sending...</span>
+                  <span className="sm:hidden">Send</span>
                 </>
               ) : (
                 <span className="flex items-center">
-                  <MessageCircle className="w-4 h-4 mr-1" />
-                  Send
+                  <MessageCircle className="w-4 h-4 mr-1.5" />
+                  <span>Send</span>
                 </span>
               )}
             </button>
           </form>
         </div>
       </div>
-    </div>
   )
 }

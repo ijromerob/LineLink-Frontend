@@ -111,90 +111,121 @@ export default function HistoricalDataSection() {
     }, [])
 
     return (
-        <div className="overflow-x-auto">
-            <LiveStatusBar lastUpdated={lastUpdated} />
-            <div className="flex flex-col lg:flex-row gap-6 min-w-[600px]">
-                {/* Historical Data Card */}
-                <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
-                    <h2 className="text-2xl font-bold mb-6 flex items-center"><ClipboardList className="w-6 h-6 mr-3" />Historical Work Orders</h2>
-                    <table className="min-w-full text-base">
-                        <thead>
-                            <tr className="text-left text-gray-700 border-b">
-                                <th className="py-3 px-4">Work Order</th>
-                                <th className="py-3 px-4">Completed</th>
-                                <th className="py-3 px-4">Missing Parts</th>
-                                <th className="py-3 px-4">Resolution</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
+        <div className="w-full">
+            <LiveStatusBar lastUpdated={lastUpdated} className="mb-4" />
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="p-4 sm:p-6">
+                    <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center">
+                        <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
+                        Historical Work Orders
+                    </h2>
+                    
+                    <div className="overflow-x-auto -mx-2 sm:mx-0">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
                                 <tr>
-                                    <td colSpan={4} className="py-8 text-center">
-                                        <div className="flex flex-col items-center justify-center">
-                                            <Loader2 className="w-8 h-8 animate-spin text-gray-500 mb-2" />
-                                            <span>Loading work orders...</span>
-                                        </div>
-                                    </td>
+                                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Work Order
+                                    </th>
+                                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                                        Status
+                                    </th>
+                                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Parts
+                                    </th>
+                                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                                        Resolution
+                                    </th>
                                 </tr>
-                            ) : error ? (
-                                <tr>
-                                    <td colSpan={4} className="py-8 text-center text-red-500">
-                                        {error}
-                                        <button 
-                                            onClick={fetchWorkOrders}
-                                            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                                        >
-                                            Retry
-                                        </button>
-                                    </td>
-                                </tr>
-                            ) : workOrders.length === 0 ? (
-                                <tr>
-                                    <td colSpan={4} className="py-8 text-center text-gray-500">
-                                        No completed work orders found
-                                    </td>
-                                </tr>
-                            ) : (
-                                workOrders.map(order => (
-                                    <tr key={order.work_order_id} className="border-b last:border-0 hover:bg-gray-50">
-                                        <td className="py-3 px-4 font-semibold">
-                                            {order.work_order_id} - {order.product_number}
-                                            <div className="text-sm text-gray-500">Qty: {order.quantity_to_produce}</div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                order.is_completed 
-                                                    ? 'bg-green-100 text-green-800' 
-                                                    : 'bg-yellow-100 text-yellow-800'
-                                            }`}>
-                                                {order.status}
-                                            </span>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex items-center gap-3">
-                                                <Package className="w-5 h-5 text-gray-500" />
-                                                <div>
-                                                    <div>Missing: {order.parts_missing}</div>
-                                                    <div className="text-sm text-gray-500">Supplied: {order.parts_supplied} / {order.total_parts_needed}</div>
-                                                </div>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-3 py-4 text-center">
+                                            <div className="flex flex-col items-center justify-center py-6">
+                                                <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-gray-500 mb-2" />
+                                                <span className="text-sm sm:text-base text-gray-600">Loading work orders...</span>
                                             </div>
                                         </td>
-                                        <td className="py-3 px-4">
-                                            {order.resolution}
-                                            {order.is_completed && (
-                                                <div className="text-sm text-green-600 mt-1">✓ Completed</div>
-                                            )}
+                                    </tr>
+                                ) : error ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-3 py-4 text-center">
+                                            <div className="py-4">
+                                                <p className="text-red-500 text-sm sm:text-base mb-3">{error}</p>
+                                                <button 
+                                                    onClick={fetchWorkOrders}
+                                                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                                >
+                                                    Retry
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                ) : workOrders.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-3 py-8 text-center">
+                                            <p className="text-gray-500 text-sm sm:text-base">No completed work orders found</p>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    workOrders.map((order) => (
+                                        <tr key={order.work_order_id} className="hover:bg-gray-50">
+                                            <td className="px-3 py-4 whitespace-nowrap">
+                                                <div className="text-sm font-medium text-gray-900">
+                                                    {order.work_order_id}
+                                                </div>
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                    {order.product_number} • Qty: {order.quantity_to_produce}
+                                                </div>
+                                                <div className="sm:hidden mt-1">
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                        order.is_completed 
+                                                            ? 'bg-green-100 text-green-800' 
+                                                            : 'bg-yellow-100 text-yellow-800'
+                                                    }`}>
+                                                        {order.status}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-4 whitespace-nowrap hidden sm:table-cell">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                    order.is_completed 
+                                                        ? 'bg-green-100 text-green-800' 
+                                                        : 'bg-yellow-100 text-yellow-800'
+                                                }`}>
+                                                    {order.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-4 whitespace-nowrap">
+                                                <div className="flex items-center">
+                                                    <Package className="flex-shrink-0 h-5 w-5 text-gray-500 mr-2" />
+                                                    <div className="text-sm text-gray-900">
+                                                        <div className="flex items-center">
+                                                            <span className="font-medium">Missing:</span>
+                                                            <span className="ml-1">{order.parts_missing}</span>
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">
+                                                            Supplied: {order.parts_supplied}/{order.total_parts_needed}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">
+                                                <div className="flex items-center">
+                                                    {order.resolution}
+                                                    {order.is_completed && (
+                                                        <CheckCircle className="ml-2 h-4 w-4 text-green-500" />
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                {/* Placeholder for side-by-side content if needed */}
-                {/* <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
-                    ...
-                </div> */}
             </div>
         </div>
     )

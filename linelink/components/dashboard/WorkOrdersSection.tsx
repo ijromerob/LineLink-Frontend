@@ -486,20 +486,23 @@ export default function WorkOrdersSection({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <LiveStatusBar lastUpdated={lastUpdated} />
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+        <div className="w-full sm:w-auto">
+          <LiveStatusBar lastUpdated={lastUpdated} />
+        </div>
         <Button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
           size="sm"
         >
-          <Plus className="w-4 h-4" /> Create Work Order
+          <Plus className="w-4 h-4" />
+          <span className="whitespace-nowrap">Create Work Order</span>
         </Button>
       </div>
       {/* Add this near your other modals */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Create New Work Order</h3>
               <button
@@ -572,29 +575,35 @@ export default function WorkOrdersSection({
         </div>
       )}
       <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex gap-6 min-w-[900px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 w-full min-w-0">
           {statusColumns.map((col) => (
-            <div key={col.key} className="flex-1 min-w-[280px]">
-              <div className="flex items-center mb-2">
-                <span className="font-semibold text-lg">{col.label}</span>
+            <div key={col.key} className="w-full min-w-0">
+              <div className="flex items-center mb-2 px-2">
+                <span className="font-semibold text-base md:text-lg">{col.label}</span>
+                <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                  {workOrders.filter(wo => wo.status === col.key).length}
+                </span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3 md:space-y-4">
                 {workOrders
                   .filter((wo) => wo.status === col.key)
                   .map((wo) => (
                     <div
                       key={wo.work_order_id}
-                      className={`bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition border-2 ${
+                      className={`bg-white rounded-lg shadow p-3 sm:p-4 cursor-pointer hover:shadow-md transition-all duration-200 border-2 ${
                         highlighted === wo.work_order_id
-                          ? "border-yellow-400 bg-yellow-50 transition"
-                          : "border-transparent"
+                          ? "border-yellow-400 bg-yellow-50 ring-2 ring-yellow-200"
+                          : "border-transparent hover:border-blue-100"
                       }`}
                       onClick={() => handleCardClick(wo)}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">{wo.product_number}</span>
+                      <div className="flex items-start justify-between mb-1">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm sm:text-base truncate">{wo.product_number}</h4>
+                          <p className="text-xs text-gray-500 truncate">WO: {wo.work_order_id}</p>
+                        </div>
                         <span
-                          className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                          className={`ml-2 text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
                             statusColors[wo.status]
                           }`}
                         >
@@ -767,8 +776,8 @@ export default function WorkOrdersSection({
       )}
       {/* Modal for work order details */}
       {selectedWO && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-6 relative animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto relative animate-fade-in my-8">
             <button
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
               onClick={handleCloseModal}
@@ -828,48 +837,51 @@ export default function WorkOrdersSection({
                 ))}
               </div>
               <form onSubmit={handleAddComment} className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Unit
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                      value={commentUnit}
-                      disabled
-                    >
-                      <option value="1">Unit 1</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Station
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                      value={commentStation}
-                      onChange={(e) => setCommentStation(e.target.value)}
-                    >
-                      <option value="1">Station 1</option>
-                      <option value="2">Station 2</option>
-                      <option value="3">Station 3</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                  value={commentUnit}
+                  disabled
+                >
+                  <option value="1">Unit 1</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Station
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                  value={commentStation}
+                  onChange={(e) => setCommentStation(e.target.value)}
+                >
+                  <option value="1">Station 1</option>
+                  <option value="2">Station 2</option>
+                  <option value="3">Station 3</option>
+                </select>
+              </div>
+            </div>
+                <div className="flex gap-2 mt-2">
                   <input
                     type="text"
-                    className="flex-1 border rounded px-2 py-1 text-sm"
+                    className="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Add a comment..."
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
+                    aria-label="Comment text"
                   />
                   <Button
                     type="submit"
                     size="sm"
-                    className="border-2 border-blue-600 bg-white text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 shadow-sm hover:shadow-md transition-all duration-200"
+                    className="h-auto px-4 py-2 border-2 border-blue-600 bg-white text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 shadow-sm hover:shadow-md transition-all duration-200"
+                    aria-label="Send comment"
                   >
-                    Send
+                    <span className="hidden sm:inline">Send</span>
+                    <MessageCircle className="w-4 h-4 sm:hidden" />
                   </Button>
                 </div>
               </form>

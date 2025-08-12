@@ -373,27 +373,31 @@ export default function ProductionOverviewSection() {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold">Production Analytics</h2>
-                    <p className="text-sm text-gray-500">Comprehensive overview of production metrics and performance</p>
+        <div className="space-y-4 md:space-y-6 px-2 sm:px-0">
+            <div className="flex flex-col space-y-3 sm:space-y-0">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                        <h2 className="text-xl sm:text-2xl font-bold">Production Analytics</h2>
+                        <p className="text-xs sm:text-sm text-gray-500">Comprehensive overview of production metrics</p>
+                    </div>
+                    <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
+                        Updated: {lastUpdated}
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 bg-gray-100 rounded-md p-1">
-                        {['7d', '30d', '90d', 'custom'].map((range) => (
+                
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1 bg-gray-100 rounded-md p-1 text-xs sm:text-sm">
+                        {['7d', '30d', '90d'].map((range) => (
                             <button
                                 key={range}
                                 onClick={() => {
-                                    if (range !== 'custom') {
-                                        setTimeRange(range as any);
-                                        setDateRange({
-                                            from: subDays(new Date(), parseInt(range)),
-                                            to: new Date(),
-                                        });
-                                    }
+                                    setTimeRange(range as any);
+                                    setDateRange({
+                                        from: subDays(new Date(), parseInt(range)),
+                                        to: new Date(),
+                                    });
                                 }}
-                                className={`px-3 py-1 text-sm rounded-md ${
+                                className={`px-2 py-1 sm:px-3 sm:py-1 rounded-md whitespace-nowrap ${
                                     timeRange === range ? 'bg-white shadow' : 'hover:bg-gray-200'
                                 }`}
                             >
@@ -401,22 +405,21 @@ export default function ProductionOverviewSection() {
                             </button>
                         ))}
                     </div>
-                    <Button variant="outline" size="sm" className="gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>Custom Range</span>
-                    </Button>
-                    <Button variant="outline" size="sm" className="gap-2">
-                        <Download className="h-4 w-4" />
-                        <span>Export</span>
-                    </Button>
-                    <div className="text-sm text-gray-500 ml-2">
-                        Updated: {lastUpdated}
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="gap-1 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9">
+                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">Custom</span>
+                        </Button>
+                        <Button variant="outline" size="sm" className="gap-1 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9">
+                            <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">Export</span>
+                        </Button>
                     </div>
                 </div>
             </div>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
                 <MetricCard 
                     label="Total Orders" 
                     value={metrics.totalOrders} 
@@ -447,73 +450,78 @@ export default function ProductionOverviewSection() {
             </div>
 
             {/* Main Chart */}
-            <div className="bg-white p-6 rounded-lg shadow">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-medium">
+            <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
+                    <h3 className="text-base sm:text-lg font-medium whitespace-nowrap">
                         {activeChart === 'production' ? 'Production Overview' : 
                          activeChart === 'defects' ? 'Defect Trends' : 'Production Efficiency'}
                     </h3>
-                    <div className="flex items-center gap-2 bg-gray-100 rounded-md p-1">
-                        <button
-                            onClick={() => setActiveChart('production')}
-                            className={`px-3 py-1 text-sm rounded-md flex items-center gap-1 ${
-                                activeChart === 'production' ? 'bg-white shadow' : 'hover:bg-gray-200'
-                            }`}
-                        >
-                            <BarChart2 className="h-4 w-4" />
-                            <span>Production</span>
-                        </button>
-                        <button
-                            onClick={() => setActiveChart('defects')}
-                            className={`px-3 py-1 text-sm rounded-md flex items-center gap-1 ${
-                                activeChart === 'defects' ? 'bg-white shadow' : 'hover:bg-gray-200'
-                            }`}
-                        >
-                            <AlertTriangle className="h-4 w-4" />
-                            <span>Defects</span>
-                        </button>
-                        <button
-                            onClick={() => setActiveChart('efficiency')}
-                            className={`px-3 py-1 text-sm rounded-md flex items-center gap-1 ${
-                                activeChart === 'efficiency' ? 'bg-white shadow' : 'hover:bg-gray-200'
-                            }`}
-                        >
-                            <LineChartIcon className="h-4 w-4" />
-                            <span>Efficiency</span>
-                        </button>
+                    <div className="w-full sm:w-auto">
+                        <div className="flex flex-wrap items-center gap-1 bg-gray-100 rounded-md p-1 text-xs sm:text-sm">
+                            <button
+                                onClick={() => setActiveChart('production')}
+                                className={`px-2 py-1 sm:px-3 sm:py-1 rounded-md flex items-center gap-1 whitespace-nowrap ${
+                                    activeChart === 'production' ? 'bg-white shadow' : 'hover:bg-gray-200'
+                                }`}
+                            >
+                                <BarChart2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span className="truncate">Production</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveChart('defects')}
+                                className={`px-2 py-1 sm:px-3 sm:py-1 rounded-md flex items-center gap-1 whitespace-nowrap ${
+                                    activeChart === 'defects' ? 'bg-white shadow' : 'hover:bg-gray-200'
+                                }`}
+                            >
+                                <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span className="truncate">Defects</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveChart('efficiency')}
+                                className={`px-2 py-1 sm:px-3 sm:py-1 rounded-md flex items-center gap-1 whitespace-nowrap ${
+                                    activeChart === 'efficiency' ? 'bg-white shadow' : 'hover:bg-gray-200'
+                                }`}
+                            >
+                                <LineChartIcon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span className="truncate">Efficiency</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 {renderChart()}
             </div>
 
             {/* Recent Activity */}
-            <div className="bg-white p-6 rounded-lg shadow">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium">Recent Activity</h3>
-                    <Button variant="outline" size="sm" onClick={() => {
-                        fetchWorkOrders();
-                    }}>
-                        <RefreshCw className="h-4 w-4 mr-2" />
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                    <h3 className="text-base sm:text-lg font-medium">Recent Activity</h3>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={fetchWorkOrders}
+                        className="w-full sm:w-auto h-9 sm:h-9 text-xs sm:text-sm"
+                    >
+                        <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                         Refresh
                     </Button>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                     {recentActivities.length > 0 ? (
                         recentActivities.map((activity, index) => (
-                            <div key={index} className="flex items-start pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-                                <div className="bg-gray-100 p-2 rounded-full mr-3">
+                            <div key={index} className="flex items-start pb-3 sm:pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+                                <div className="bg-gray-100 p-1.5 sm:p-2 rounded-full mr-2 sm:mr-3 flex-shrink-0">
                                     {activity.action.includes('Completed') ? (
-                                        <CheckCircle className="w-4 h-4 text-green-500" />
+                                        <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
                                     ) : activity.action.includes('missing') ? (
-                                        <AlertCircle className="w-4 h-4 text-yellow-500" />
+                                        <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
                                     ) : (
-                                        <AlertTriangle className="w-4 h-4 text-blue-500" />
+                                        <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" />
                                     )}
                                 </div>
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-start">
-                                        <p className="text-sm font-medium">{activity.action}</p>
-                                        <span className="text-xs text-gray-500">{activity.time}</span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1">
+                                        <p className="text-xs sm:text-sm font-medium truncate">{activity.action}</p>
+                                        <span className="text-xs text-gray-500 whitespace-nowrap">{activity.time}</span>
                                     </div>
                                     <p className="text-xs text-gray-500">by {activity.user}</p>
                                 </div>

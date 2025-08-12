@@ -347,37 +347,49 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
-      <header className="sticky top-0 z-20 bg-white bg-opacity-90 backdrop-blur h-16 flex-shrink-0 shadow-sm flex items-center">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-sm h-16 flex-shrink-0 shadow-sm flex items-center border-b border-gray-100">
+        <div className="w-full px-3 sm:px-4 lg:px-6">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <Monitor className="w-5 h-5 text-white" />
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <button 
+                className="lg:hidden p-2 -ml-1 rounded-lg hover:bg-gray-100 transition-colors"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+              >
+                {sidebarOpen ? (
+                  <X className="w-5 h-5 text-gray-600" />
+                ) : (
+                  <Menu className="w-5 h-5 text-gray-600" />
+                )}
+              </button>
+              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
+                <Monitor className="w-4 h-4 text-white" />
               </div>
-              <span className="text-xl font-medium text-gray-900">
+              <span className="text-lg sm:text-xl font-medium text-gray-900 whitespace-nowrap">
                 LineLink
               </span>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               {/* Start Call Dropdown */}
               <div className="relative">
                 <Button
                   variant="outline"
-                  className="flex items-center gap-2"
+                  size="sm"
+                  className="flex items-center gap-1.5 text-sm px-3 py-1.5 h-9"
                   disabled={loading}
                   onClick={() => setCallDropdownOpen((v) => !v)}
                 >
-                  <Video className="w-5 h-5" />
-                  Start Call
-                  <span className="ml-1">▼</span>
+                  <Video className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                  <span className="hidden sm:inline">Start Call</span>
+                  <span className="ml-0.5 text-xs">▼</span>
                 </Button>
                 {callDropdownOpen && (
                   <div
                     id="call-dropdown"
-                    className="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg z-50 border"
+                    className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-50 border border-gray-100 overflow-hidden py-1"
                   >
                     <button
-                      className="w-full flex items-center px-4 py-2 hover:bg-gray-100 text-left"
+                      className="w-full flex items-center px-4 py-2.5 text-sm hover:bg-gray-50 text-left transition-colors"
                       onClick={() => {
                         setCallDropdownOpen(false);
                         setUserSelectOpen(true);
@@ -385,11 +397,11 @@ export default function Dashboard() {
                       }}
                       disabled={loading}
                     >
-                      <Video className="w-4 h-4 mr-2" />
+                      <Video className="w-4 h-4 mr-2.5 flex-shrink-0" />
                       Instant Meeting
                     </button>
                     <button
-                      className="w-full flex items-center px-4 py-2 hover:bg-gray-100 text-left"
+                      className="w-full flex items-center px-4 py-2.5 text-sm hover:bg-gray-50 text-left transition-colors"
                       onClick={() => {
                         setCallDropdownOpen(false);
                         setUserSelectOpen(true);
@@ -397,81 +409,74 @@ export default function Dashboard() {
                       }}
                       disabled={loading}
                     >
-                      <CalendarPlus className="w-4 h-4 mr-2" />
+                      <CalendarPlus className="w-4 h-4 mr-2.5 flex-shrink-0" />
                       Schedule Meeting
                     </button>
                   </div>
                 )}
               </div>
-              {/* Profile Avatar, Name, and Title directly in header */}
+              {/* Profile Dropdown */}
               <div className="relative">
                 <button
-                  className="flex items-center space-x-2 focus:outline-none"
+                  className="flex items-center space-x-1.5 sm:space-x-2 focus:outline-none group"
                   onClick={() => setProfileDropdownOpen((v) => !v)}
-                  aria-label="Profile"
+                  aria-label="Profile menu"
                   type="button"
                 >
-                  <div className="flex flex-col text-right">
-                    <span className="font-bold text-gray-900 leading-tight">
+                  <div className="hidden sm:flex flex-col text-right">
+                    <span className="text-sm font-medium text-gray-900 leading-tight truncate max-w-[120px]">
                       {user
                         ? `${user.first_name} ${user.last_name}`
                         : "Loading..."}
                     </span>
-                    <span className="text-xs text-gray-500 leading-tight">
+                    <span className="text-xs text-gray-500 leading-tight truncate max-w-[120px]">
                       {user?.company || "Loading..."}
                     </span>
                   </div>
-                  <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-lg font-bold text-blue-700 border-2 border-white shadow-sm">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm sm:text-base font-bold text-blue-700 border-2 border-white shadow-sm group-hover:ring-2 group-hover:ring-blue-100 transition-all">
                     {`${user?.first_name?.[0]?.toUpperCase() || ""}${
                       user?.last_name?.[0]?.toUpperCase() || ""
                     }`}
                   </div>
                 </button>
                 {profileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl z-50 border animate-fade-in p-2 flex flex-col space-y-2">
-                    {/* <Link 
-                        href="/profile"
-                        className="w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center"
-                        onClick={() => setProfileDropdownOpen(false)}
-                      >
-                        <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        My Profile
-                      </Link> */}
-                    <button
-                      className="w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center"
-                      onClick={logout}
-                    >
-                      <svg
-                        className="w-4 h-4 mr-2 text-red-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                        />
-                      </svg>
-                      Sign out
-                    </button>
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl z-50 border border-gray-100 overflow-hidden animate-fade-in">
+                    <div className="p-2">
+                      <div className="px-3 py-2.5 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {user ? `${user.first_name} ${user.last_name}` : 'User'}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {user?.email || 'No email'}
+                        </p>
+                      </div>
+                      <div className="py-1">
+                        <button
+                          className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center"
+                          onClick={logout}
+                        >
+                          <svg
+                            className="w-4 h-4 mr-2.5 text-red-500 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                            />
+                          </svg>
+                          Sign out
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
-              <button
-                className="lg:hidden ml-2 p-2 rounded hover:bg-gray-100"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-              >
-                {sidebarOpen ? (
-                  <X className="w-5 h-5" />
-                ) : (
-                  <Menu className="w-5 h-5" />
-                )}
-              </button>
+
             </div>
           </div>
         </div>
@@ -551,32 +556,56 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      <div className="flex flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex flex-1 flex-col lg:flex-row w-full max-w-7xl mx-auto px-0 sm:px-2 lg:px-6 py-0 lg:py-6 gap-0 lg:gap-6">
+        {/* Sidebar - Mobile Overlay */}
+        <div 
+          className={`fixed inset-0 bg-black/50 z-30 lg:hidden transition-opacity duration-300 ease-in-out ${
+            sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+        
         {/* Sidebar */}
-        <div className="flex flex-col w-64 mr-8" style={{ overflowY: "auto" }}>
-          <DashboardSidebar
-            sections={sections}
-            selected={selected}
-            setSelected={setSelected}
-            sidebarOpen={sidebarOpen}
-            setSidebarOpen={setSidebarOpen}
-          />
-          {meetings.length > 0 && (
-            <div className="mt-4">
-              <CalendarSidebar events={meetings} />
-            </div>
-          )}
+        <div 
+          className={`fixed lg:sticky top-16 lg:top-6 left-0 h-[calc(100vh-4rem)] lg:h-[calc(100vh-3rem)] w-72 bg-white lg:bg-transparent z-40 transform transition-all duration-300 ease-in-out lg:translate-x-0 ${
+            sidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full lg:translate-x-0'
+          }`}
+          style={{ overflowY: "auto" }}
+        >
+          <div className="h-full p-4 lg:p-0">
+            <DashboardSidebar
+              sections={sections}
+              selected={selected}
+              setSelected={setSelected}
+              sidebarOpen={sidebarOpen}
+              setSidebarOpen={setSidebarOpen}
+            />
+            {meetings.length > 0 && (
+              <div className="mt-4 lg:mt-6">
+                <CalendarSidebar events={meetings} />
+              </div>
+            )}
+          </div>
         </div>
+        
         {/* Main Content */}
         <main
-          className="flex-1 overflow-y-auto"
-          style={{ maxHeight: "calc(100vh - 6rem)" }}
+          className="flex-1 w-full bg-white lg:rounded-xl shadow-sm p-4 sm:p-6 overflow-y-auto transition-all duration-300"
+          style={{ 
+            '--max-height': 'calc(100vh - 4rem)',
+            minHeight: 'calc(100vh - 4rem)'
+          } as React.CSSProperties}
         >
-          {selectedSection ? selectedSection.content : null}
+          <div className="max-w-full">
+            {selectedSection ? selectedSection.content : null}
+          </div>
         </main>
       </div>
-      <footer className="h-12 flex-shrink-0 bg-white border-t border-gray-200 flex items-center justify-center text-center text-sm text-gray-600">
-        <p className="w-full">&copy; 2025 LineLink. All rights reserved.</p>
+      <footer className="h-12 flex-shrink-0 bg-white border-t border-gray-100 flex items-center justify-center text-center text-xs sm:text-sm text-gray-500 px-4">
+        <p className="w-full max-w-7xl mx-auto">
+          &copy; {new Date().getFullYear()} LineLink. All rights reserved.
+        </p>
       </footer>
     </div>
   );

@@ -26,8 +26,18 @@
     --radius: 0.75rem;
   }
 
+  /* Responsive max-height for dashboard content */
+  .responsive-max-height {
+    max-height: var(--max-height, auto);
+  }
+
+  @media (min-width: 1024px) {
+    .responsive-max-height {
+      --max-height: calc(100vh - 6rem);
+    }
+  }
+
   .dark {
-    --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;

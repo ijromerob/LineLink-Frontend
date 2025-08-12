@@ -98,80 +98,97 @@ export default function MissingPartsSection() {
     };
 
     return (
-        <div className="overflow-x-auto">
-            <LiveStatusBar lastUpdated={lastUpdated} />
-            <div className="flex flex-col gap-6 min-w-[600px]">
-                <div className="bg-white rounded-xl shadow-lg p-8 flex-1">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold flex items-center">
-                            <Package className="w-6 h-6 mr-3" />
+        <div className="w-full">
+            <LiveStatusBar lastUpdated={lastUpdated} className="mb-4" />
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6">
+                        <h2 className="text-xl sm:text-2xl font-bold flex items-center mb-2 sm:mb-0">
+                            <Package className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
                             Missing Parts
                         </h2>
-                        <div className="text-sm text-gray-500">
-                            Last updated: {lastUpdated}
+                        <div className="text-xs sm:text-sm text-gray-500">
+                            Updated: {lastUpdated}
                         </div>
                     </div>
-                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                        {loading ? (
-                            <div className="flex justify-center items-center h-20">
-                                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                            </div>
-                        ) : parts.length === 0 ? (
-                            <div className="text-gray-500 text-center py-4">
-                                No missing parts at the moment
-                            </div>
-                        ) : (
-                            parts.map((part) => (
-                                <div 
-                                    key={`${part.work_order}-${part.part_number}`} 
-                                    className="border rounded-lg p-4 hover:shadow-md transition-shadow"
-                                >
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-medium">{part.description}</h3>
-                                            <p className="text-sm text-gray-600">
-                                                Part #: {part.part_number} • WO: {part.work_order}
-                                            </p>
-                                            <div className="mt-2 flex gap-4">
-                                                <span className="text-sm">
-                                                    Needed: <span className="font-medium">{part.quantity_required}</span>
-                                                </span>
-                                                <span className="text-sm">
-                                                    Supplied: <span className="font-medium">{part.quantity_supplied}</span>
-                                                </span>
-                                                <span className="text-sm">
-                                                    Missing: <span className="font-medium text-red-600">
-                                                        {part.quantity_required - part.quantity_supplied}
-                                                    </span>
-                                                </span>
+                    
+                    <div className="overflow-x-auto -mx-2 sm:mx-0">
+                        <div className="min-w-full">
+                            {loading ? (
+                                <div className="flex justify-center items-center py-8">
+                                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                                </div>
+                            ) : parts.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <Package className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+                                    <p className="text-sm sm:text-base">No missing parts at the moment</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {parts.map((part) => (
+                                        <div 
+                                            key={`${part.work_order}-${part.part_number}`}
+                                            className="border rounded-lg p-3 sm:p-4 hover:shadow-sm transition-shadow"
+                                        >
+                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <h3 className="text-sm sm:text-base font-medium text-gray-900 line-clamp-2">
+                                                            {part.description}
+                                                        </h3>
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                                            statusColors[part.status] || statusColors.default
+                                                        }`}>
+                                                            {part.status}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <div className="mt-1 text-xs sm:text-sm text-gray-600">
+                                                        <p>Part #: {part.part_number} • WO: {part.work_order}</p>
+                                                    </div>
+                                                    
+                                                    <div className="mt-2 grid grid-cols-2 sm:flex sm:gap-4 text-xs sm:text-sm">
+                                                        <div className="flex items-center">
+                                                            <span className="text-gray-500 mr-1">Needed:</span>
+                                                            <span className="font-medium">{part.quantity_required}</span>
+                                                        </div>
+                                                        <div className="flex items-center">
+                                                            <span className="text-gray-500 mr-1">Supplied:</span>
+                                                            <span className="font-medium">{part.quantity_supplied}</span>
+                                                        </div>
+                                                        <div className="col-span-2 mt-1 sm:mt-0 sm:flex items-center">
+                                                            <span className="text-gray-500 mr-1">Missing:</span>
+                                                            <span className="font-medium text-red-600">
+                                                                {part.quantity_required - part.quantity_supplied}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                {part.status === 'requested' && (
+                                                    <div className="mt-2 sm:mt-0 sm:pl-4 border-t sm:border-t-0 sm:border-l border-gray-100 pt-3 sm:pt-0 sm:ml-4">
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="outline"
+                                                            className="w-full sm:w-auto"
+                                                            onClick={() => handleDispatch(part)}
+                                                            disabled={dispatching[`${part.work_order}-${part.part_number}`]}
+                                                        >
+                                                            {dispatching[`${part.work_order}-${part.part_number}`] ? (
+                                                                <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                                                            ) : (
+                                                                <Truck className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                                                            )}
+                                                            Dispatch
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                        <span className={`text-xs px-2 py-1 rounded-full ${
-                                            statusColors[part.status] || statusColors.default
-                                        }`}>
-                                            {part.status}
-                                        </span>
-                                    </div>
-                                    <div className="mt-3 flex justify-end">
-                                        {part.status === 'requested' && (
-                                            <Button 
-                                                size="sm" 
-                                                variant="outline"
-                                                onClick={() => handleDispatch(part)}
-                                                disabled={dispatching[`${part.work_order}-${part.part_number}`]}
-                                            >
-                                                {dispatching[`${part.work_order}-${part.part_number}`] ? (
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                ) : (
-                                                    <Truck className="mr-2 h-4 w-4" />
-                                                )}
-                                                Dispatch
-                                            </Button>
-                                        )}
-                                    </div>
+                                    ))}
                                 </div>
-                            ))
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
