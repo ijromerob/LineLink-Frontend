@@ -1,21 +1,15 @@
-import { useEffect, useState } from "react"
-import { Button } from "../ui/button"
-import { Package, CheckCircle, Truck, Loader2 } from "lucide-react"
-import LiveStatusBar from "./LiveStatusBar"
-import { useApi } from "@/contexts/AuthContext"
+import { useEffect, useState } from "react";
+import { Button } from "../ui/button";
+import { Package, Truck, Loader2 } from "lucide-react";
+import LiveStatusBar from "./LiveStatusBar";
+import { useApi } from "@/contexts/AuthContext";
 import toast from 'react-hot-toast';
-import { useAuth } from "@/contexts/AuthContext";
 
 const statusColors: Record<string, string> = {
     requested: "bg-yellow-100 text-yellow-800",
     dispatched: "bg-blue-100 text-blue-800",
-    acknowledged: "bg-green-100 text-green-800",
     default: "bg-gray-100 text-gray-800"
 };
-
-function getNowString() {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-}
 
 interface MissingPart {
     work_order: string;
@@ -23,33 +17,39 @@ interface MissingPart {
     description: string;
     quantity_required: number;
     quantity_supplied: number;
-    status: 'requested' | 'dispatched' | 'acknowledged';
+    status: 'requested' | 'dispatched';
 }
 
 export default function MissingPartsSection() {
     const api = useApi();
-    const { user } = useAuth();
-    
     const [parts, setParts] = useState<MissingPart[]>([]);
     const [loading, setLoading] = useState(true);
-    const [lastUpdated, setLastUpdated] = useState(getNowString());
-    const [error, setError] = useState<string | null>(null);
+    const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString());
     const [dispatching, setDispatching] = useState<Record<string, boolean>>({});
 
-    // const userRole = user?.role === 'warehouse' ? 'warehouse' : 'production';
-
-    // Fetch missing parts from the API
     const fetchMissingParts = async () => {
         try {
             setLoading(true);
             const response = await api.get('/parts/needed_parts');
-            setParts(response.data || []);
-            setError(null);
-            setLastUpdated(getNowString());
+            
+            // Ensure we have an array to work with
+            const partsArray = Array.isArray(response?.data) ? response.data : [];
+            
+            const partsWithStatus = partsArray.map((part: any) => ({
+                work_order: part.work_order || '',
+                part_number: part.part_number || '',
+                description: part.description || '',
+                quantity_required: Number(part.quantity_required) || 0,
+                quantity_supplied: Number(part.quantity_supplied) || 0,
+                status: part.quantity_supplied >= part.quantity_required ? 'dispatched' : 'requested'
+            }));
+
+            setParts(partsWithStatus);
+            setLastUpdated(new Date().toLocaleTimeString());
         } catch (err: any) {
             console.error("Failed to load missing parts:", err);
-            setError(err.response?.data?.error || 'Failed to load missing parts');
-            toast.error('Failed to load missing parts. Please try again later.');
+            toast.error(err.message || 'Failed to load missing parts');
+            setParts([]);
         } finally {
             setLoading(false);
         }
@@ -57,7 +57,6 @@ export default function MissingPartsSection() {
 
     useEffect(() => {
         fetchMissingParts();
-        // Set up polling every 30 seconds
         const interval = setInterval(fetchMissingParts, 30000);
         return () => clearInterval(interval);
     }, []);
@@ -68,55 +67,40 @@ export default function MissingPartsSection() {
         try {
             setDispatching(prev => ({ ...prev, [partKey]: true }));
             
-            // Make the API call to dispatch parts
-            await api.post('/parts/dispatch', {
-                work_order_id: part.work_order,
-                station_number: 1, // This should come from the station context if available
+            // Dispatch the full missing quantity
+            const quantityToDispatch = part.quantity_required - part.quantity_supplied;
+            
+            await api.post('/warehouse/dispatch', {
                 part_number: part.part_number,
-                quantity_supplied: part.quantity_required - part.quantity_supplied
+                quantity_supplied: quantityToDispatch,
+                station_number: "1",
+                work_order_id: part.work_order
             });
             
-            // Update local state optimistically
+            // Optimistic update - mark as fully dispatched
             setParts(prev => prev.map(p => 
                 p.work_order === part.work_order && p.part_number === part.part_number
-                    ? { ...p, status: 'dispatched', quantity_supplied: p.quantity_required }
+                    ? { 
+                        ...p, 
+                        quantity_supplied: p.quantity_required,
+                        status: 'dispatched'
+                    }
                     : p
             ));
             
-            toast.success('Parts dispatched successfully!');
-            
+            toast.success(`Dispatched ${quantityToDispatch} ${part.description}`);
         } catch (err: any) {
-            console.error('Failed to dispatch part:', err);
-            toast.error(err.response?.data?.error || 'Failed to dispatch parts');
+            console.error('Dispatch failed:', err);
+            toast.error(err.response?.data?.error || 'Dispatch failed');
         } finally {
             setDispatching(prev => ({ ...prev, [partKey]: false }));
-        }
-    };
-
-    const handleAcknowledge = async (part: MissingPart) => {
-        try {
-            // Update local state optimistically
-            setParts(prev => prev.map(p => 
-                p.work_order === part.work_order && p.part_number === part.part_number
-                    ? { ...p, status: 'acknowledged' }
-                    : p
-            ));
-            
-            // In a real app, you would make an API call here to update the status
-            toast.success('Parts acknowledged!');
-            
-        } catch (err) {
-            console.error('Failed to acknowledge parts:', err);
-            toast.error('Failed to acknowledge parts');
         }
     };
 
     return (
         <div className="overflow-x-auto">
             <LiveStatusBar lastUpdated={lastUpdated} />
-            {error && <div className="text-red-500 mb-2">{error}</div>}
             <div className="flex flex-col gap-6 min-w-[600px]">
-                {/* Missing Parts Card */}
                 <div className="bg-white rounded-xl shadow-lg p-8 flex-1">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold flex items-center">
@@ -138,27 +122,38 @@ export default function MissingPartsSection() {
                             </div>
                         ) : (
                             parts.map((part) => (
-                                <div key={`${part.work_order}-${part.part_number}`} className="border rounded-lg p-4">
+                                <div 
+                                    key={`${part.work_order}-${part.part_number}`} 
+                                    className="border rounded-lg p-4 hover:shadow-md transition-shadow"
+                                >
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <h3 className="font-medium">{part.description}</h3>
                                             <p className="text-sm text-gray-600">
-                                                {part.part_number} • WO: {part.work_order}
+                                                Part #: {part.part_number} • WO: {part.work_order}
                                             </p>
-                                            <div className="mt-2">
+                                            <div className="mt-2 flex gap-4">
                                                 <span className="text-sm">
-                                                    Needed: {part.quantity_required} • 
-                                                    Supplied: {part.quantity_supplied} • 
-                                                    Missing: {part.quantity_required - part.quantity_supplied}
+                                                    Needed: <span className="font-medium">{part.quantity_required}</span>
+                                                </span>
+                                                <span className="text-sm">
+                                                    Supplied: <span className="font-medium">{part.quantity_supplied}</span>
+                                                </span>
+                                                <span className="text-sm">
+                                                    Missing: <span className="font-medium text-red-600">
+                                                        {part.quantity_required - part.quantity_supplied}
+                                                    </span>
                                                 </span>
                                             </div>
                                         </div>
-                                        <span className={`text-xs px-2 py-1 rounded-full ${statusColors[part.status] || statusColors.default}`}>
+                                        <span className={`text-xs px-2 py-1 rounded-full ${
+                                            statusColors[part.status] || statusColors.default
+                                        }`}>
                                             {part.status}
                                         </span>
                                     </div>
-                                    <div className="mt-3 flex justify-end gap-2">
-                                        {part.quantity_supplied < part.quantity_required && (
+                                    <div className="mt-3 flex justify-end">
+                                        {part.status === 'requested' && (
                                             <Button 
                                                 size="sm" 
                                                 variant="outline"
@@ -171,16 +166,6 @@ export default function MissingPartsSection() {
                                                     <Truck className="mr-2 h-4 w-4" />
                                                 )}
                                                 Dispatch
-                                            </Button>
-                                        )}
-                                        {part.status === 'dispatched' && (
-                                            <Button 
-                                                size="sm" 
-                                                variant="outline"
-                                                onClick={() => handleAcknowledge(part)}
-                                            >
-                                                <CheckCircle className="mr-2 h-4 w-4" />
-                                                Acknowledge
                                             </Button>
                                         )}
                                     </div>

@@ -1,15 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type React from "react";
-import {
-  ClipboardList,
-  MessageCircle,
-  Package,
-  X,
-  CheckCircle,
-  Plus,
-  AlertTriangle,
-  Loader2,
-} from "lucide-react";
+import { MessageCircle, Package, X, Plus, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
 import LiveStatusBar from "./LiveStatusBar";
 import { useApi } from "@/contexts/AuthContext";
@@ -53,6 +44,14 @@ const useApiWithRetry = () => {
   return { callWithRetry };
 };
 
+interface Comment {
+  user: string;
+  text: string;
+  time: string;
+  station_number: string;
+  unit_number?: string;
+}
+
 // Backend work order type (exact match with API response)
 type BackendWorkOrder = {
   work_order_id: string; // "WO0000001"
@@ -68,7 +67,7 @@ type WorkOrder = BackendWorkOrder & {
   status: "Pending" | "In Progress" | "Completed";
   progress: number;
   description: string;
-  comments: { user: string; text: string; time: string }[];
+  comments: Comment[];
   partsRequested: { part: string; qty: number }[];
 };
 
@@ -130,22 +129,25 @@ export default function WorkOrdersSection({
   );
   const [partRequestLoading, setPartRequestLoading] = useState(false);
   const highlightTimeout = useRef<NodeJS.Timeout | null>(null);
+  //   const [comments, setComments] = useState<Comment[]>([]);
+  const [commentStation, setCommentStation] = useState("1"); // Default to Station 1
+  const [commentUnit, setCommentUnit] = useState("1"); // Default to Unit 1
 
   const transformWorkOrders = (
     backendOrders: BackendWorkOrder[]
   ): WorkOrder[] => {
     return backendOrders.map((wo) => ({
       ...wo,
-      status: wo.is_completed 
-        ? "Completed" 
-        : wo.parts_supplied > 0 
-          ? "In Progress" 
-          : "Pending",
+      status: wo.is_completed
+        ? "Completed"
+        : wo.parts_supplied > 0
+        ? "In Progress"
+        : "Pending",
       progress: wo.is_completed
         ? 100
         : wo.total_parts_needed > 0
-          ? Math.round((wo.parts_supplied / wo.total_parts_needed) * 100)
-          : 0,
+        ? Math.round((wo.parts_supplied / wo.total_parts_needed) * 100)
+        : 0,
       description: `Produce ${wo.quantity_to_produce} units`,
       comments: [],
       partsRequested: [],
@@ -170,10 +172,10 @@ export default function WorkOrdersSection({
 
   const markWorkOrderComplete = async (workOrderId: string) => {
     try {
-      const response = await api.post("/workorders/complete", { 
-        work_order_id: workOrderId 
+      const response = await api.post("/workorders/complete", {
+        work_order_id: workOrderId,
       });
-      
+
       if (response.message === "Work order marked as complete") {
         toast.success("Work order completed!");
         await fetchWorkOrders();
@@ -217,13 +219,13 @@ export default function WorkOrdersSection({
   async function createWorkOrder(productNumber: string, quantity: number) {
     setCreating(true);
     setError("");
-    
+
     try {
       const response = await api.post("/workorders/create_workorder", {
         product_number: productNumber.trim(),
-        quantity: quantity
+        quantity: quantity,
       });
-  
+
       if (response?.work_order_id) {
         toast.success(`Work order ${response.work_order_id} created!`);
         await fetchWorkOrders();
@@ -231,9 +233,10 @@ export default function WorkOrdersSection({
       }
       throw new Error("Invalid response from server");
     } catch (error: any) {
-      const message = error.response?.data?.error || 
-                     error.message || 
-                     "Failed to create work order";
+      const message =
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to create work order";
       setError(message);
       toast.error(message);
       throw error;
@@ -262,29 +265,70 @@ export default function WorkOrdersSection({
     onWorkOrderSelect?.(null);
   }
 
-  function handleAddComment(e: React.FormEvent<HTMLFormElement>) {
+  const postComment = async (
+    workOrderId: string,
+    unitNumber: number,
+    stationNumber: string,
+    commentText: string
+  ) => {
+    try {
+      const response = await api.put(
+        `/workorders/${workOrderId}/units/${unitNumber}/stations/${stationNumber}/comment`,
+        { comment: commentText }
+      );
+
+      if (response.message === "Comment updated successfully") {
+        return true;
+      }
+      throw new Error(response.error || "Failed to post comment");
+    } catch (error) {
+      console.error("Error posting comment:", error);
+      toast.error("Failed to post comment");
+      return false;
+    }
+  };
+
+  const handleAddComment = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!comment.trim() || !selectedWO) return;
-    // This is still local only; implement API if needed
-    setWorkOrders((prev) =>
-      prev.map((wo) =>
-        wo.work_order_id === selectedWO.work_order_id
-          ? {
-              ...wo,
-              comments: [
-                ...wo.comments,
-                { user: "You", text: comment, time: "now" },
-              ],
-            }
-          : wo
-      )
+    if (!comment.trim() || !selectedWO || !user) return;
+
+    const success = await postComment(
+      selectedWO.work_order_id,
+      1, // Using unit_number = 1 as default (adjust if you have multiple units)
+      commentStation, // The selected station from state
+      comment
     );
-    setHighlighted(selectedWO.work_order_id);
-    setLastUpdated(getNowString());
-    setComment("");
-    if (highlightTimeout.current) clearTimeout(highlightTimeout.current);
-    highlightTimeout.current = setTimeout(() => setHighlighted(null), 1200);
-  }
+
+    if (success) {
+      // Update local state to show the new comment immediately
+      setWorkOrders((prev) =>
+        prev.map((wo) =>
+          wo.work_order_id === selectedWO.work_order_id
+            ? {
+                ...wo,
+                comments: [
+                  ...wo.comments,
+                  {
+                    user: `${user.first_name} ${user.last_name}`,
+                    text: comment,
+                    time: new Date().toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                    station_number: commentStation,
+                    unit_number: "1", // Changed from number to string
+                  },
+                ],
+              }
+            : wo
+        )
+      );
+      setHighlighted(selectedWO.work_order_id);
+      setComment("");
+      if (highlightTimeout.current) clearTimeout(highlightTimeout.current);
+      highlightTimeout.current = setTimeout(() => setHighlighted(null), 1200);
+    }
+  };
 
   const fetchWorkOrdersAndUpdate = async () => {
     try {
@@ -379,27 +423,31 @@ export default function WorkOrdersSection({
       });
   }
 
-const handlePartRequestSubmit = async (e: React.FormEvent) => {
+  const handlePartRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentWorkOrderId) return;
     setPartRequestLoading(true);
-    
+
     try {
       await api.post("/parts/part_request", {
         work_order_id: currentWorkOrderId,
         part_number: partRequest.part_number,
         quantity_requested: Number(partRequest.quantity_requested),
         station_number: partRequest.station_number,
-        requested_by: user?.user_id
+        requested_by: user?.user_id,
       });
-  
-      setWorkOrders(prev => prev.map(wo => 
-        wo.work_order_id === currentWorkOrderId 
-          ? { ...wo, status: "In Progress" } 
-          : wo
-      ));
-      
-      toast.success("Parts requested successfully! Work order moved to In Progress.");
+
+      setWorkOrders((prev) =>
+        prev.map((wo) =>
+          wo.work_order_id === currentWorkOrderId
+            ? { ...wo, status: "In Progress" }
+            : wo
+        )
+      );
+
+      toast.success(
+        "Parts requested successfully! Work order moved to In Progress."
+      );
       setShowPartRequestModal(false);
     } catch (error) {
       toast.error("Failed to request parts");
@@ -412,20 +460,20 @@ const handlePartRequestSubmit = async (e: React.FormEvent) => {
   // Create Work Order handler
   async function handleCreateWorkOrder(e: React.FormEvent) {
     e.preventDefault();
-    
+
     console.log("Creating with:", {
       product: createProductNumber,
-      quantity: createQuantity
+      quantity: createQuantity,
     });
-  
+
     try {
       const qty = Number(createQuantity);
       if (isNaN(qty) || qty <= 0) {
         throw new Error("Please enter a valid quantity (>0)");
       }
-  
+
       await createWorkOrder(createProductNumber, qty);
-      
+
       // Reset form on success
       setCreateProductNumber("");
       setCreateQuantity("");
@@ -449,80 +497,80 @@ const handlePartRequestSubmit = async (e: React.FormEvent) => {
         </Button>
       </div>
       {/* Add this near your other modals */}
-{showCreateModal && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div className="bg-white rounded-lg p-6 w-full max-w-md">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Create New Work Order</h3>
-        <button 
-          onClick={() => setShowCreateModal(false)}
-          className="text-gray-500 hover:text-gray-700"
-          aria-label="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-      
-      <form onSubmit={handleCreateWorkOrder} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Product Number <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={createProductNumber}
-            onChange={(e) => setCreateProductNumber(e.target.value)}
-            placeholder="Enter product number"
-          />
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Create New Work Order</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateWorkOrder} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Product Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={createProductNumber}
+                  onChange={(e) => setCreateProductNumber(e.target.value)}
+                  placeholder="Enter product number"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={createQuantity}
+                  onChange={(e) => setCreateQuantity(e.target.value)}
+                  placeholder="Enter quantity"
+                />
+              </div>
+
+              {error && <div className="text-red-500 text-sm">{error}</div>}
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCreateModal(false)}
+                  disabled={creating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={creating || !createProductNumber || !createQuantity}
+                >
+                  {creating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Work Order"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Quantity <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            required
-            min="1"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={createQuantity}
-            onChange={(e) => setCreateQuantity(e.target.value)}
-            placeholder="Enter quantity"
-          />
-        </div>
-        
-        {error && (
-          <div className="text-red-500 text-sm">{error}</div>
-        )}
-        
-        <div className="flex justify-end space-x-3 pt-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setShowCreateModal(false)}
-            disabled={creating}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            disabled={creating || !createProductNumber || !createQuantity}
-          >
-            {creating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
-              </>
-            ) : 'Create Work Order'}
-          </Button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
+      )}
       <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex gap-6 min-w-[900px]">
           {statusColumns.map((col) => (
@@ -765,35 +813,65 @@ const handlePartRequestSubmit = async (e: React.FormEvent) => {
                   <div className="text-gray-400 text-sm">No comments yet.</div>
                 )}
                 {selectedWO.comments.map((c, i) => (
-                  <div
-                    key={i}
-                    className="bg-gray-50 rounded px-3 py-2 text-sm flex items-center justify-between"
-                  >
-                    <span>
+                  <div key={i} className="bg-gray-50 rounded px-3 py-2 text-sm">
+                    <div className="flex justify-between">
                       <span className="font-medium text-gray-700">
-                        {c.user}:
-                      </span>{" "}
-                      {c.text}
-                    </span>
-                    <span className="text-xs text-gray-400 ml-2">{c.time}</span>
+                        {c.user}
+                      </span>
+                      <span className="text-xs text-gray-400">{c.time}</span>
+                    </div>
+                    <p className="mt-1">{c.text}</p>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Unit {c.unit_number} • Station {c.station_number}
+                    </div>
                   </div>
                 ))}
               </div>
-              <form className="flex gap-2" onSubmit={handleAddComment}>
-                <input
-                  type="text"
-                  className="flex-1 border rounded px-2 py-1 text-sm"
-                  placeholder="Add a comment..."
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                />
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="border-2 border-blue-600 bg-white text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 shadow-sm hover:shadow-md transition-all duration-200"
-                >
-                  Send
-                </Button>
+              <form onSubmit={handleAddComment} className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Unit
+                    </label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      value={commentUnit}
+                      disabled
+                    >
+                      <option value="1">Unit 1</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Station
+                    </label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      value={commentStation}
+                      onChange={(e) => setCommentStation(e.target.value)}
+                    >
+                      <option value="1">Station 1</option>
+                      <option value="2">Station 2</option>
+                      <option value="3">Station 3</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="flex-1 border rounded px-2 py-1 text-sm"
+                    placeholder="Add a comment..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="border-2 border-blue-600 bg-white text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 shadow-sm hover:shadow-md transition-all duration-200"
+                  >
+                    Send
+                  </Button>
+                </div>
               </form>
             </div>
             {/* Request Parts */}

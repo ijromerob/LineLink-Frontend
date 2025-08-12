@@ -263,35 +263,15 @@ export default function ProductionOverviewSection() {
         }
     };
 
-    const fetchReportData = async () => {
-        try {
-            setLoading(true);
-            const params = new URLSearchParams();
-            if (dateRange.from) params.append('start_date', format(dateRange.from, 'yyyy-MM-dd'));
-            if (dateRange.to) params.append('end_date', format(dateRange.to, 'yyyy-MM-dd'));
-            
-            const response = await api.get(`/reports/production?${params.toString()}`);
-            setReportData(response.data || generateMockData());
-        } catch (error) {
-            console.error('Error fetching report data:', error);
-            toast.error('Failed to load report data');
-            setReportData(generateMockData());
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
         const fetchData = async () => {
             await fetchWorkOrders();
-            await fetchReportData();
         };
 
         fetchData();
         
         const interval = setInterval(() => {
             fetchWorkOrders();
-            fetchReportData();
             setLastUpdated(getNowString());
         }, 30000);
 
@@ -512,7 +492,6 @@ export default function ProductionOverviewSection() {
                     <h3 className="text-lg font-medium">Recent Activity</h3>
                     <Button variant="outline" size="sm" onClick={() => {
                         fetchWorkOrders();
-                        fetchReportData();
                     }}>
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Refresh
