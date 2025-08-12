@@ -396,7 +396,7 @@ export default function Dashboard() {
                   </button>
                   {profileDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl z-50 border animate-fade-in p-2 flex flex-col space-y-2">
-                      <Link 
+                      {/* <Link 
                         href="/profile"
                         className="w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center"
                         onClick={() => setProfileDropdownOpen(false)}
@@ -405,7 +405,7 @@ export default function Dashboard() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                         My Profile
-                      </Link>
+                      </Link> */}
                       <button
                         className="w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center"
                         onClick={logout}

@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useApi } from '@/contexts/AuthContext';
 
-export default function ResetPassword() {
+// Create a wrapper component that uses useSearchParams
+function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const api = useApi();
@@ -78,74 +79,65 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+      <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Reset Your Password
-          </h2>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Reset your password</h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Please enter your new password below.
           </p>
         </div>
-
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm space-y-4">
+          <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="password" className="sr-only">
-                New Password
-              </label>
+              <label htmlFor="password" className="sr-only">New Password</label>
               <Input
                 id="password"
                 name="password"
                 type="password"
                 required
-                className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="New Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={8}
               />
             </div>
             <div>
-              <label htmlFor="confirmPassword" className="sr-only">
-                Confirm New Password
-              </label>
+              <label htmlFor="confirmPassword" className="sr-only">Confirm Password</label>
               <Input
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
                 required
-                className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Confirm New Password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                minLength={8}
               />
             </div>
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
+            <div className="text-red-600 text-sm text-center">
+              {error}
             </div>
           )}
 
           {message && (
-            <div className="rounded-md bg-green-50 p-4">
-              <div className="text-sm text-green-700">{message}</div>
+            <div className="text-green-600 text-sm text-center">
+              {message}
             </div>
           )}
 
           <div>
             <Button
               type="submit"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               {loading ? (
                 <>
                   <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
-                  Resetting Password...
+                  Resetting...
                 </>
               ) : (
                 'Reset Password'
@@ -155,5 +147,18 @@ export default function ResetPassword() {
         </form>
       </div>
     </div>
+  );
+}
+
+// Main component that wraps the form in a Suspense boundary
+export default function ResetPassword() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin h-8 w-8 text-indigo-600" />
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

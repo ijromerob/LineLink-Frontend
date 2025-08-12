@@ -167,7 +167,7 @@ export default function SignIn() {
   const handleGoogleLogin = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get<{ url: string }>("/auth/google");
+      const response = await api.get<{ url: string }>("/google/auth");
       window.location.href = response.url;
     } catch (error: any) {
       setError("Failed to initiate Google login");
