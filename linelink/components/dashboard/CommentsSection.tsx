@@ -31,73 +31,148 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
   const [error, setError] = useState<string | null>(null)
 
   const fetchComments = async () => {
+    // Validate required parameters
+    if (!workOrderId) {
+      setError('No work order selected');
+      return;
+    }
+
     try {
       setLoading(true);
-      // Fetch the work order details which includes station comments
+      setError(null);
+      
+      // Try to fetch comments from the work order's comments array first
       const response = await api.get(`/workorders/${workOrderId}`);
       
-      if (response && response.units) {
-        // Find the specific unit and station
+      if (response && Array.isArray(response.comments)) {
+        // Format comments from the API response
+        const formattedComments = response.comments.map((comment: any) => ({
+          id: comment.id || Date.now().toString(),
+          user: comment.user || 'Operator',
+          text: comment.text || comment.comment || '',
+          created_at: comment.created_at || new Date().toISOString(),
+          timestamp: comment.timestamp || comment.created_at || new Date().toISOString()
+        }));
+        
+        setComments(formattedComments);
+      } else if (response && response.units) {
+        // Fallback to legacy format for backward compatibility
         const unit = response.units.find((u: any) => u.unit_number === unitNumber);
         if (unit) {
           const station = unit.stations.find((s: any) => s.station_number === stationNumber);
-          if (station && station.station_comments) {
-            // Format the comment to match our interface
-            const formattedComment: Comment = {
+          if (station?.station_comments) {
+            setComments([{
+              id: '1',
               user: 'Operator',
               text: station.station_comments,
               timestamp: station.updated_at || new Date().toISOString()
-            };
-            setComments([formattedComment]);
-          } else {
-            setComments([]);
+            }]);
+            return;
           }
-        } else {
-          setComments([]);
         }
+        setComments([]);
+      } else {
+        setComments([]);
       }
       
       setLastUpdated(getNowString());
-      setError(null);
     } catch (err) {
       console.error('Error fetching comments:', err);
-      setError('Failed to load comments');
+      setError('Failed to load comments. Please check your connection.');
+      toast.error('Failed to load comments');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchComments();
+    // Only fetch if all required parameters are available
+    if (workOrderId && unitNumber && stationNumber) {
+      fetchComments();
+    }
   }, [workOrderId, unitNumber, stationNumber]);
 
   const handleAddComment = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!comment.trim()) return;
+    const commentText = comment.trim();
+    if (!commentText) return;
+    
+    if (!workOrderId) {
+      setError('No work order selected');
+      toast.error('Please select a work order first');
+      return;
+    }
     
     try {
       setLoading(true);
       
-      // Update the station comment via the API
-      await api.put(
-        `/workorders/${workOrderId}/units/${unitNumber}/stations/${stationNumber}/comment`,
-        { comment: comment.trim() }
-      );
+      // Add the comment via the API
+      const newComment: Comment = {
+        user: 'You',
+        text: commentText,
+        timestamp: new Date().toISOString()
+      };
       
-      // Refresh comments after successful submission
+      // Try the new comments endpoint first
+      try {
+        await api.post(`/workorders/${workOrderId}/comments`, {
+          text: commentText
+        });
+      } catch (newEndpointError) {
+        console.warn('New comments endpoint failed, falling back to legacy endpoint', newEndpointError);
+        
+        // Fallback to legacy endpoint if the new one fails
+        if (unitNumber && stationNumber) {
+          await api.put(
+            `/workorders/${workOrderId}/units/${unitNumber}/stations/${stationNumber}/comment`,
+            { comment: commentText }
+          );
+        } else {
+          throw new Error('Legacy endpoint requires unit and station numbers');
+        }
+      }
+      
+      // Add the comment to the local state immediately for better UX
+      setComments(prev => [...prev, {
+        ...newComment,
+        id: Date.now().toString(),
+        created_at: newComment.timestamp
+      }]);
+      
+      setComment('');
+      toast.success('Comment added successfully');
+      
+      // Refresh comments to ensure we have the latest data
       await fetchComments();
-      setComment("");
       
-      // Show success message
-      toast.success('Comment updated successfully');
     } catch (err) {
       console.error('Error adding comment:', err);
-      setError('Failed to update comment. Please try again.');
-      toast.error('Failed to update comment');
+      const errorMessage = (err as Error).message || 'Failed to add comment';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  // Show loading state if work order ID is missing
+  if (!workOrderId) {
+    return (
+      <div className="overflow-x-auto">
+        <div className="flex flex-col lg:flex-row gap-6 min-w-[600px]">
+          <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
+            <h2 className="text-2xl font-bold mb-6 flex items-center">
+              <MessageCircle className="w-6 h-6 mr-3" />
+              Comments & Issues
+            </h2>
+            <div className="text-amber-600 text-sm p-2 bg-amber-50 rounded">
+              Please select a work order to view or add comments
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -105,7 +180,10 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
       <div className="flex flex-col lg:flex-row gap-6 min-w-[600px]">
         {/* Comments Card */}
         <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
-          <h2 className="text-2xl font-bold mb-6 flex items-center"><MessageCircle className="w-6 h-6 mr-3" />Comments & Issues</h2>
+          <h2 className="text-2xl font-bold mb-6 flex items-center">
+            <MessageCircle className="w-6 h-6 mr-3" />
+            Comments & Issues
+          </h2>
           <div className="space-y-3 max-h-60 overflow-y-auto mb-6">
             {loading && !comments.length ? (
               <div className="flex justify-center items-center h-20">
@@ -114,6 +192,13 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
             ) : error ? (
               <div className="text-red-500 text-sm p-2 bg-red-50 rounded">
                 {error}
+                <button 
+                  onClick={fetchComments}
+                  className="ml-2 text-blue-600 hover:text-blue-800 underline"
+                  disabled={loading}
+                >
+                  Retry
+                </button>
               </div>
             ) : comments.length === 0 ? (
               <div className="text-gray-400 text-base">No comments yet.</div>
@@ -158,12 +243,7 @@ export default function CommentsSection({ workOrderId, unitNumber, stationNumber
             </button>
           </form>
         </div>
-        {/* Placeholder for Issues or other side-by-side content */}
-        {/* <div className="bg-white rounded-xl shadow-lg p-8 flex-1 min-w-[320px]">
-          <h2 className="text-2xl font-bold mb-6 flex items-center">Issues</h2>
-          ...
-        </div> */}
       </div>
     </div>
   )
-} 
+}
