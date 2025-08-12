@@ -97,12 +97,6 @@ function getNowString() {
   });
 }
 
-// Extracts numeric ID from formatted work order ID
-function extractWorkOrderId(formattedId: string): number | null {
-  const match = formattedId.match(/^WO(\d+)$/);
-  return match ? parseInt(match[1], 10) : null;
-}
-
 interface WorkOrdersSectionProps {
   onWorkOrderSelect?: (workOrder: WorkOrder | null) => void;
 }
@@ -142,23 +136,22 @@ export default function WorkOrdersSection({
   ): WorkOrder[] => {
     return backendOrders.map((wo) => ({
       ...wo,
-      status: wo.is_completed
-        ? "Completed"
-        : wo.parts_supplied > 0
-        ? "In Progress"
-        : "Pending",
+      status: wo.is_completed 
+        ? "Completed" 
+        : wo.parts_supplied > 0 
+          ? "In Progress" 
+          : "Pending",
       progress: wo.is_completed
         ? 100
         : wo.total_parts_needed > 0
-        ? Math.round((wo.parts_supplied / wo.total_parts_needed) * 100)
-        : 0,
+          ? Math.round((wo.parts_supplied / wo.total_parts_needed) * 100)
+          : 0,
       description: `Produce ${wo.quantity_to_produce} units`,
       comments: [],
       partsRequested: [],
     }));
   };
 
-  // Fetch work orders from API
   const fetchWorkOrders = async () => {
     setLoading(true);
     try {
@@ -168,49 +161,28 @@ export default function WorkOrdersSection({
         setLastUpdated(new Date().toLocaleTimeString());
       }
     } catch (error) {
+      console.error("Fetch error:", error);
       toast.error("Failed to fetch work orders");
     } finally {
       setLoading(false);
     }
   };
 
-  // Mark complete - uses exact backend format
   const markWorkOrderComplete = async (workOrderId: string) => {
     try {
-      // Optimistic update
-      setWorkOrders(prev => prev.map(wo => 
-        wo.work_order_id === workOrderId 
-          ? { ...wo, status: "Completed", progress: 100 } 
-          : wo
-      ));
-  
-      await api.post("/workorders/complete", { work_order_id: workOrderId });
-      toast.success("Work order completed");
-    } catch (error) {
-      // Revert on error
-      fetchWorkOrders();
-      toast.error("Failed to complete work order");
-    }
-  };
-
-  const handlePartRequest = async (
-    workOrderId: string,
-    partData: {
-      part_number: string;
-      quantity_requested: number;
-      station_number: number;
-    }
-  ) => {
-    try {
-      await api.post("/parts/part_request", {
-        work_order_id: workOrderId, // "WO0000001"
-        ...partData,
-        requested_by: user?.user_id,
+      const response = await api.post("/workorders/complete", { 
+        work_order_id: workOrderId 
       });
-      await fetchWorkOrders();
-      toast.success("Parts requested");
+      
+      if (response.message === "Work order marked as complete") {
+        toast.success("Work order completed!");
+        await fetchWorkOrders();
+      } else {
+        toast.error("Cannot complete - not all stations are finished");
+      }
     } catch (error) {
-      toast.error("Failed to request parts");
+      toast.error("Failed to complete work order");
+      console.error("Completion error:", error);
     }
   };
 
@@ -219,7 +191,6 @@ export default function WorkOrdersSection({
     setShowPartRequestModal(true);
   };
 
-  // Fetch work orders on component mount and set up auto-refresh
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -248,14 +219,6 @@ export default function WorkOrdersSection({
     setError("");
     
     try {
-      // Basic validation
-      if (!productNumber.trim()) {
-        throw new Error("Product number is required");
-      }
-      if (quantity <= 0) {
-        throw new Error("Quantity must be greater than 0");
-      }
-  
       const response = await api.post("/workorders/create_workorder", {
         product_number: productNumber.trim(),
         quantity: quantity
@@ -263,14 +226,12 @@ export default function WorkOrdersSection({
   
       if (response?.work_order_id) {
         toast.success(`Work order ${response.work_order_id} created!`);
-        await fetchWorkOrders(); // Refresh the list
+        await fetchWorkOrders();
         return response.work_order_id;
-      } else {
-        throw new Error("Invalid response from server");
       }
+      throw new Error("Invalid response from server");
     } catch (error: any) {
-      console.error("Creation error:", error);
-      const message = error.response?.data?.message || 
+      const message = error.response?.data?.error || 
                      error.message || 
                      "Failed to create work order";
       setError(message);
@@ -418,33 +379,35 @@ export default function WorkOrdersSection({
       });
   }
 
-  // Handle part request submission
-  const handlePartRequestSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!currentWorkOrderId) return;
-
-  try {
-    await api.post("/parts/part_request", {
-      work_order_id: currentWorkOrderId, // Use formatted ID directly
-      part_number: partRequest.part_number,
-      quantity_requested: Number(partRequest.quantity_requested),
-      station_number: partRequest.station_number,
-      requested_by: user?.user_id
-    });
-
-    // Update local state optimistically
-    setWorkOrders(prev => prev.map(wo => 
-      wo.work_order_id === currentWorkOrderId 
-        ? { ...wo, status: "In Progress" } 
-        : wo
-    ));
-
-    toast.success("Work started successfully!");
-    setShowPartRequestModal(false);
-  } catch (error) {
-    toast.error("Failed to start work");
-  }
-};
+const handlePartRequestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentWorkOrderId) return;
+    setPartRequestLoading(true);
+    
+    try {
+      await api.post("/parts/part_request", {
+        work_order_id: currentWorkOrderId,
+        part_number: partRequest.part_number,
+        quantity_requested: Number(partRequest.quantity_requested),
+        station_number: partRequest.station_number,
+        requested_by: user?.user_id
+      });
+  
+      setWorkOrders(prev => prev.map(wo => 
+        wo.work_order_id === currentWorkOrderId 
+          ? { ...wo, status: "In Progress" } 
+          : wo
+      ));
+      
+      toast.success("Parts requested successfully! Work order moved to In Progress.");
+      setShowPartRequestModal(false);
+    } catch (error) {
+      toast.error("Failed to request parts");
+      console.error("Part request error:", error);
+    } finally {
+      setPartRequestLoading(false);
+    }
+  };
 
   // Create Work Order handler
   async function handleCreateWorkOrder(e: React.FormEvent) {
