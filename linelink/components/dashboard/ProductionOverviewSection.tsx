@@ -1,9 +1,9 @@
 "use client"
 
-import { AlertTriangle, CheckCircle, AlertCircle, Loader2, Calendar, Download, BarChart2, LineChart as LineChartIcon, RefreshCw } from "lucide-react"
+import { AlertTriangle, CheckCircle, AlertCircle, Loader2, Calendar, Download as DownloadIcon, BarChart2, LineChart as LineChartIcon, RefreshCw, FileDown } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from 'recharts'
 import { DateRange } from 'react-day-picker'
-import { format, subDays } from 'date-fns'
+import { subDays, format, differenceInDays, addDays, isSameDay } from 'date-fns';
 import { toast } from 'react-hot-toast'
 import { Button } from "../ui/button"
 import { useApi } from "@/contexts/AuthContext"
@@ -20,6 +20,9 @@ interface WorkOrder {
     parts_supplied: number;
     total_parts_needed: number;
     partsRequested?: Array<{ part: string; qty: number }>;
+    created_at?: string;
+    updated_at?: string;
+    completed_at?: string;
 }
 
 interface WorkOrdersResponse {
@@ -131,6 +134,33 @@ const getRecentActivity = (workOrders: WorkOrder[]) => {
         });
 };
 
+// Function to convert data to CSV format
+const convertToCSV = (data: any[]) => {
+    if (data.length === 0) return '';
+    
+    // Get headers from the first object's keys
+    const headers = Object.keys(data[0]);
+    
+    // Create CSV header row
+    let csvContent = headers.join(',') + '\n';
+    
+    // Add data rows
+    data.forEach(item => {
+        const row = headers.map(header => {
+            const value = item[header];
+            // Handle values that might contain commas or quotes
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+                return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+        });
+        csvContent += row.join(',') + '\n';
+    });
+    
+    return csvContent;
+};
+
+// Function to trigger download
 export default function ProductionOverviewSection() {
     const api = useApi();
     const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | 'custom'>('30d');
@@ -252,31 +282,163 @@ export default function ProductionOverviewSection() {
         return data;
     };
 
-    const handleExport = async (format: 'csv' | 'pdf' | 'excel') => {
+    const handleExportData = () => {
         try {
-            toast.success(`Exporting data as ${format.toUpperCase()}...`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            toast.success('Export completed!');
+            // Prepare data for export based on active chart
+            let dataToExport: any[] = [];
+            
+            if (activeChart === 'production') {
+                dataToExport = reportData.map(item => ({
+                    date: item.date,
+                    completed: item.completed,
+                    inProgress: item.inProgress,
+                    total: item.completed + item.inProgress
+                }));
+            } else if (activeChart === 'defects') {
+                dataToExport = reportData.map(item => ({
+                    date: item.date,
+                    defects: item.defects,
+                    totalProduction: item.completed + item.inProgress,
+                    defectRate: ((item.defects / (item.completed + item.inProgress || 1)) * 100).toFixed(1) + '%'
+                }));
+            } else if (activeChart === 'efficiency') {
+                dataToExport = reportData.map(item => ({
+                    date: item.date,
+                    efficiency: item.efficiency.toFixed(1) + '%',
+                    completed: item.completed,
+                    inProgress: item.inProgress
+                }));
+            }
+            
+            if (dataToExport.length === 0) {
+                toast.error('No data available to export');
+                return;
+            }
+            
+            // Convert to CSV
+            const csvContent = convertToCSV(dataToExport);
+            
+            // Create download link
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            
+            // Set filename based on active chart
+            const chartType = activeChart.charAt(0).toUpperCase() + activeChart.slice(1);
+            const dateStr = new Date().toISOString().split('T')[0];
+            link.download = `LineLink_${chartType}_Report_${dateStr}.csv`;
+            
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Clean up
+            URL.revokeObjectURL(url);
+            
+            toast.success('Export completed successfully');
         } catch (error) {
             console.error('Export failed:', error);
-            toast.error('Export failed. Please try again.');
+            toast.error('Failed to export data');
         }
     };
 
+    // Update date range when timeRange changes
+    useEffect(() => {
+        if (timeRange !== 'custom') {
+            const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+            setDateRange({
+                from: subDays(new Date(), days - 1),
+                to: new Date()
+            });
+        }
+    }, [timeRange]);
+
+    // Fetch data when date range or any other dependency changes
     useEffect(() => {
         const fetchData = async () => {
-            await fetchWorkOrders();
+            try {
+                setLoading(true);
+                await Promise.all([
+                    loadMetrics(),
+                    fetchWorkOrders()
+                ]);
+                
+                // Generate report data based on the selected time range
+                if (dateRange.from && dateRange.to) {
+                    const days = differenceInDays(dateRange.to, dateRange.from) + 1;
+                    const reportData = [];
+                    
+                    for (let i = 0; i < days; i++) {
+                        const currentDate = addDays(dateRange.from, i);
+                        const dateKey = format(currentDate, 'MMM dd');
+                        
+                        // Filter work orders for this date
+                        const dailyWorkOrders = workOrders.filter(wo => {
+                            // If no timestamps are available, include all work orders
+                            if (!wo.created_at && !wo.updated_at) {
+                                return true;
+                            }
+                            
+                            // Use the most recent timestamp available
+                            const timestamp = wo.updated_at || wo.created_at || '';
+                            const woDate = new Date(timestamp);
+                            
+                            // If date is invalid, include it (this handles cases where timestamps might be missing)
+                            if (isNaN(woDate.getTime())) {
+                                return true;
+                            }
+                            
+                            return isSameDay(woDate, currentDate);
+                        });
+                        
+                        const completed = dailyWorkOrders.filter(wo => wo.is_completed).length;
+                        const inProgress = dailyWorkOrders.filter(wo => !wo.is_completed).length;
+                        const defects = dailyWorkOrders.filter(wo => wo.parts_missing > 0).length;
+                        
+                        reportData.push({
+                            date: dateKey,
+                            completed,
+                            inProgress,
+                            defects,
+                            efficiency: dailyWorkOrders.length > 0 
+                                ? Math.round((completed / dailyWorkOrders.length) * 100) 
+                                : 0
+                        });
+                    }
+                    
+                    setReportData(reportData);
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                setError('Failed to load production data. Please try again.');
+            } finally {
+                setLoading(false);
+                setLastUpdated(getNowString());
+            }
         };
 
         fetchData();
         
         const interval = setInterval(() => {
-            fetchWorkOrders();
-            setLastUpdated(getNowString());
+            fetchData();
         }, 30000);
 
         return () => clearInterval(interval);
-    }, [timeRange, dateRange]);
+    }, [JSON.stringify(dateRange)]); // Use JSON.stringify to avoid unnecessary re-renders
+
+    const loadMetrics = async () => {
+        try {
+            setLoading(true);
+            
+        } catch (error) {
+            console.error('Error fetching metrics:', error);
+            setError('Failed to load metrics. Please try again later.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const renderChart = () => {
         if (loading) {
@@ -410,8 +572,8 @@ export default function ProductionOverviewSection() {
                             <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
                             <span className="hidden sm:inline">Custom</span>
                         </Button>
-                        <Button variant="outline" size="sm" className="gap-1 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9">
-                            <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <Button variant="outline" size="sm" onClick={handleExportData} className="gap-1 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9">
+                            <DownloadIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                             <span className="hidden sm:inline">Export</span>
                         </Button>
                     </div>
@@ -495,15 +657,18 @@ export default function ProductionOverviewSection() {
             <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                     <h3 className="text-base sm:text-lg font-medium">Recent Activity</h3>
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={fetchWorkOrders}
-                        className="w-full sm:w-auto h-9 sm:h-9 text-xs sm:text-sm"
-                    >
-                        <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                        Refresh
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={fetchWorkOrders}
+                            className="h-9 text-xs sm:text-sm"
+                        >
+                            <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                            Refresh
+                        </Button>
+                        
+                    </div>
                 </div>
                 <div className="space-y-3 sm:space-y-4">
                     {recentActivities.length > 0 ? (
