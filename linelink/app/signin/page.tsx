@@ -167,8 +167,7 @@ export default function SignIn() {
   const handleGoogleLogin = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get<{ url: string }>("/auth/login");
-      window.location.href = response.url;
+      window.location.href = "https://linelink-backend.onrender.com/api/auth/login";
     } catch (error: any) {
       setError("Failed to initiate Google login");
       setIsLoading(false);
@@ -190,12 +189,24 @@ export default function SignIn() {
       if (code) {
         try {
           setIsLoading(true);
-          const response = await api.post<SignInResponse>("/auth/callback", {
-            code,
+          const url = `/auth/callback?code=${encodeURIComponent(code)}`
+          const response = await fetch(url, {
+            method: "GET",
+            credentials: "include", // <---- important for cookies!
+            headers: {
+              "Content-Type": "application/json",
+            },
           });
 
-          if (response.data?.user && response.data?.token) {
-            await login(response.data.token, response.data.user);
+          if (!response.ok) {
+            throw new Error("Failed to fetch OAuth callback");
+          }
+
+          const json = await response.json();
+
+          if (json.token && json.user) {
+          await login(json.token, json.user);
+          router.push("/dashboard");
           }
         } catch (error: any) {
           console.error("OAuth callback error:", error);
