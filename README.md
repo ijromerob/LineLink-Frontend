@@ -83,10 +83,6 @@ linelink/
 └── tailwind.config.js   # TailwindCSS configuration
 ```
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Acknowledgments
 
 - Inspired by the need for efficient production line management
