@@ -6,6 +6,7 @@ import LiveStatusBar from "./LiveStatusBar";
 import { useApi } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
+import { fetchMissingParts } from "@/store/missingPartsThunks";
 
 // Custom hook for API calls with retry logic
 const useApiWithRetry = () => {
@@ -44,13 +45,14 @@ const useApiWithRetry = () => {
   return { callWithRetry };
 };
 
-interface Comment {
-  user: string;
-  text: string;
-  time: string;
-  station_number: string;
-  unit_number?: string;
-}
+
+interface PartRequest {
+    part_number: string;
+    quantity_requested: string;
+    unit_number: string;
+    station_number: string;
+    description?: string;
+  }
 
 // Backend work order type (exact match with API response)
 type BackendWorkOrder = {
@@ -67,8 +69,25 @@ type WorkOrder = BackendWorkOrder & {
   status: "Pending" | "In Progress" | "Completed";
   progress: number;
   description: string;
-  comments: Comment[];
-  partsRequested: { part: string; qty: number }[];
+  details?: BackendWorkOrderDetail; // Add detailed view
+  partsRequested?: PartRequest[]; // Define a proper type if needed
+};
+
+type BackendWorkOrderDetail = {
+  units: {
+    unit_number: string;
+    stations: {
+      station_number: string;
+      unit_status: string;
+      station_status: string;
+      station_comments: string;
+      part_number: string;
+      part_description: string;
+      quantity_required: number;
+      quantity_supplied: number;
+    }[];
+  }[];
+  is_completed: boolean;
 };
 
 const statusColumns = [
@@ -107,7 +126,6 @@ export default function WorkOrdersSection({
   const { user } = useAuth();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [selectedWO, setSelectedWO] = useState<WorkOrder | null>(null);
-  const [comment, setComment] = useState("");
   const [partNumber, setPartNumber] = useState("");
   const [partQty, setPartQty] = useState("");
   const [highlighted, setHighlighted] = useState<string | null>(null);
@@ -122,6 +140,8 @@ export default function WorkOrdersSection({
     part_number: "",
     quantity_requested: "",
     station_number: "1",
+    unit_number: selectedWO?.details?.units[0]?.unit_number || "1",
+    description: ""
   });
   const [showPartRequestModal, setShowPartRequestModal] = useState(false);
   const [currentWorkOrderId, setCurrentWorkOrderId] = useState<string | null>(
@@ -129,9 +149,6 @@ export default function WorkOrdersSection({
   );
   const [partRequestLoading, setPartRequestLoading] = useState(false);
   const highlightTimeout = useRef<NodeJS.Timeout | null>(null);
-  //   const [comments, setComments] = useState<Comment[]>([]);
-  const [commentStation, setCommentStation] = useState("1"); // Default to Station 1
-  const [commentUnit, setCommentUnit] = useState("1"); // Default to Unit 1
 
   const transformWorkOrders = (
     backendOrders: BackendWorkOrder[]
@@ -153,6 +170,34 @@ export default function WorkOrdersSection({
       partsRequested: [],
     }));
   };
+
+  const fetchWorkOrderDetails = async (workOrderId: string) => {
+    try {
+      const response = await api.get(`/workorders/${workOrderId}`);
+      if (response?.units) {
+        setSelectedWO((prev) => {
+            if (!prev) return null; // Handle null case
+            return {
+              ...prev,
+              details: response,
+              // Make sure all required fields from WorkOrder are included
+              status: prev.status || "Pending", // Provide a default status
+              progress: prev.progress || 0, // Provide a default progress
+              description: prev.description || "", // Provide a default description
+            };
+          });
+      }
+    } catch (error) {
+      toast.error("Failed to fetch work order details");
+    }
+  };
+
+  // Call this when a work order is selected
+  useEffect(() => {
+    if (selectedWO) {
+      fetchWorkOrderDetails(selectedWO.work_order_id);
+    }
+  }, [selectedWO]);
 
   const fetchWorkOrders = async () => {
     setLoading(true);
@@ -189,9 +234,34 @@ export default function WorkOrdersSection({
   };
 
   const handleStartWork = (workOrderId: string) => {
-    setCurrentWorkOrderId(workOrderId);
-    setShowPartRequestModal(true);
-  };
+    console.log('handleStartWork called for:', workOrderId); // Debug log
+    
+    const workOrder = workOrders.find((wo) => wo.work_order_id === workOrderId);
+    console.log('Found work order:', workOrder); // Debug log
+    
+    if (workOrder?.details?.units?.length) {
+      // Set default unit and station from the first available
+      const defaultUnit = workOrder.details.units[0].unit_number;
+      const defaultStation = workOrder.details.units[0].stations[0]?.station_number || "1";
+      
+      console.log('Setting defaults - Unit:', defaultUnit, 'Station:', defaultStation); // Debug log
+      
+      setPartRequest(prev => ({
+        ...prev,
+        part_number: "",
+        quantity_requested: "",
+        unit_number: defaultUnit,
+        station_number: defaultStation,
+      }));
+      
+      console.log('Setting currentWorkOrderId and showing modal'); // Debug log
+      setCurrentWorkOrderId(workOrderId);
+      setShowPartRequestModal(true);
+    } else {
+      console.log('No units found in work order details'); // Debug log
+      toast.error('Work order details not loaded yet');
+    }
+};
 
   useEffect(() => {
     const fetchData = async () => {
@@ -248,7 +318,6 @@ export default function WorkOrdersSection({
   function handleCardClick(wo: WorkOrder) {
     setSelectedWO(wo);
     onWorkOrderSelect?.(wo);
-    setComment("");
     setPartNumber("");
     setPartQty("");
 
@@ -264,71 +333,6 @@ export default function WorkOrdersSection({
     setSelectedWO(null);
     onWorkOrderSelect?.(null);
   }
-
-  const postComment = async (
-    workOrderId: string,
-    unitNumber: number,
-    stationNumber: string,
-    commentText: string
-  ) => {
-    try {
-      const response = await api.put(
-        `/workorders/${workOrderId}/units/${unitNumber}/stations/${stationNumber}/comment`,
-        { comment: commentText }
-      );
-
-      if (response.message === "Comment updated successfully") {
-        return true;
-      }
-      throw new Error(response.error || "Failed to post comment");
-    } catch (error) {
-      console.error("Error posting comment:", error);
-      toast.error("Failed to post comment");
-      return false;
-    }
-  };
-
-  const handleAddComment = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!comment.trim() || !selectedWO || !user) return;
-
-    const success = await postComment(
-      selectedWO.work_order_id,
-      1, // Using unit_number = 1 as default (adjust if you have multiple units)
-      commentStation, // The selected station from state
-      comment
-    );
-
-    if (success) {
-      // Update local state to show the new comment immediately
-      setWorkOrders((prev) =>
-        prev.map((wo) =>
-          wo.work_order_id === selectedWO.work_order_id
-            ? {
-                ...wo,
-                comments: [
-                  ...wo.comments,
-                  {
-                    user: `${user.first_name} ${user.last_name}`,
-                    text: comment,
-                    time: new Date().toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    }),
-                    station_number: commentStation,
-                    unit_number: "1", // Changed from number to string
-                  },
-                ],
-              }
-            : wo
-        )
-      );
-      setHighlighted(selectedWO.work_order_id);
-      setComment("");
-      if (highlightTimeout.current) clearTimeout(highlightTimeout.current);
-      highlightTimeout.current = setTimeout(() => setHighlighted(null), 1200);
-    }
-  };
 
   const fetchWorkOrdersAndUpdate = async () => {
     try {
@@ -373,7 +377,6 @@ export default function WorkOrdersSection({
               ? Math.round((wo.parts_supplied / wo.total_parts_needed) * 100)
               : 0,
           description: `Order #${wo.work_order_id} - ${wo.quantity_to_produce} units`,
-          comments: [],
           partsRequested: [],
         };
       });
@@ -390,7 +393,7 @@ export default function WorkOrdersSection({
     }
   };
 
-  function handleRequestPart(e: React.FormEvent<HTMLFormElement>) {
+  const handleRequestPart = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!partNumber.trim() || !partQty.trim() || !selectedWO || !user) return;
     setPartRequestLoading(true);
@@ -421,37 +424,59 @@ export default function WorkOrdersSection({
       .finally(() => {
         setPartRequestLoading(false);
       });
-  }
+  };
 
   const handlePartRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentWorkOrderId) return;
+    if (!currentWorkOrderId || !user) return;
+  
+    // Basic validation
+    if (!partRequest.part_number.trim() || !partRequest.quantity_requested) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+  
+    const quantity = Number(partRequest.quantity_requested);
+    if (isNaN(quantity) || quantity <= 0) {
+      toast.error("Please enter a valid quantity");
+      return;
+    }
+  
     setPartRequestLoading(true);
-
     try {
-      await api.post("/parts/part_request", {
-        work_order_id: currentWorkOrderId,
-        part_number: partRequest.part_number,
-        quantity_requested: Number(partRequest.quantity_requested),
+      const response = await api.post("/parts/part_request", {
+        work_order_id: currentWorkOrderId.replace('WO', ''),
+        part_number: partRequest.part_number.trim(),
+        quantity_requested: quantity,
         station_number: partRequest.station_number,
-        requested_by: user?.user_id,
+        unit_number: partRequest.unit_number,
+        requested_by: user.user_id,
+        description: partRequest.description?.trim() || undefined
       });
-
-      setWorkOrders((prev) =>
-        prev.map((wo) =>
-          wo.work_order_id === currentWorkOrderId
-            ? { ...wo, status: "In Progress" }
-            : wo
-        )
-      );
-
-      toast.success(
-        "Parts requested successfully! Work order moved to In Progress."
-      );
+  
+      if (response.error) {
+        throw new Error(response.error);
+      }
+  
+      toast.success("Part request submitted successfully!");
       setShowPartRequestModal(false);
-    } catch (error) {
-      toast.error("Failed to request parts");
-      console.error("Part request error:", error);
+      
+      // Refresh the missing parts list and work orders
+    //   fetchMissingParts();
+
+      fetchWorkOrdersAndUpdate();
+      
+      // Reset form
+      setPartRequest({
+        part_number: "",
+        quantity_requested: "",
+        unit_number: "1",
+        station_number: "1",
+        description: ""
+      });
+    } catch (error: any) {
+      console.error("Error submitting part request:", error);
+      toast.error(error.message || "Failed to submit part request");
     } finally {
       setPartRequestLoading(false);
     }
@@ -670,7 +695,7 @@ export default function WorkOrdersSection({
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">
-                Request Parts to Start Work
+              Request Parts for {currentWorkOrderId}
               </h3>
               <button
                 onClick={() => setShowPartRequestModal(false)}
@@ -698,6 +723,7 @@ export default function WorkOrdersSection({
                     })
                   }
                   placeholder="Enter part number"
+                  disabled={partRequestLoading}
                 />
               </div>
 
@@ -718,29 +744,113 @@ export default function WorkOrdersSection({
                     })
                   }
                   placeholder="Enter quantity"
+                  disabled={partRequestLoading}
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Station Number <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={partRequest.station_number}
-                  onChange={(e) =>
-                    setPartRequest({
-                      ...partRequest,
-                      station_number: e.target.value,
-                    })
-                  }
-                >
-                  <option value="1">Station 1</option>
-                  <option value="2">Station 2</option>
-                  <option value="3">Station 3</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Unit <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={partRequest.unit_number}
+                    onChange={(e) => {
+                      const selectedUnit = selectedWO?.details?.units?.find(u => u.unit_number === e.target.value);
+                      setPartRequest(prev => ({
+                        ...prev,
+                        unit_number: e.target.value,
+                        // Reset station when unit changes
+                        station_number: selectedUnit?.stations?.[0]?.station_number || '1'
+                      }));
+                    }}
+                    disabled={partRequestLoading || !selectedWO?.details?.units?.length}
+                  >
+                    <option value="">Select a unit</option>
+                    {selectedWO?.details?.units?.map((unit) => (
+                      <option key={unit.unit_number} value={unit.unit_number}>
+                        Unit {unit.unit_number}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Station <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={partRequest.station_number}
+                    onChange={(e) =>
+                      setPartRequest(prev => ({
+                        ...prev,
+                        station_number: e.target.value,
+                      }))
+                    }
+                    disabled={partRequestLoading || !partRequest.unit_number}
+                  >
+                    <option value="">Select a station</option>
+                    {selectedWO?.details?.units
+                      ?.find(u => u.unit_number === partRequest.unit_number)
+                      ?.stations?.map((station) => (
+                        <option key={station.station_number} value={station.station_number}>
+                          Station {station.station_number}
+                        </option>
+                      )) || <option value="">No stations available</option>}
+                  </select>
+                </div>
               </div>
+              
+              {/* Station Part Requirements */}
+              {selectedWO?.details?.units
+                .find(u => u.unit_number === partRequest.unit_number)
+                ?.stations.find(s => s.station_number === partRequest.station_number) && (
+                <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Station Requirements</h4>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <p>
+                      <span className="font-medium">Current Part:</span>{' '}
+                      {selectedWO.details.units
+                        .find(u => u.unit_number === partRequest.unit_number)
+                        ?.stations.find(s => s.station_number === partRequest.station_number)
+                        ?.part_number || 'None specified'}
+                    </p>
+                    <p>
+                      <span className="font-medium">Description:</span>{' '}
+                      {selectedWO.details.units
+                        .find(u => u.unit_number === partRequest.unit_number)
+                        ?.stations.find(s => s.station_number === partRequest.station_number)
+                        ?.part_description || 'No description available'}
+                    </p>
+                    <p>
+                      <span className="font-medium">Required:</span>{' '}
+                      {selectedWO.details.units
+                        .find(u => u.unit_number === partRequest.unit_number)
+                        ?.stations.find(s => s.station_number === partRequest.station_number)
+                        ?.quantity_required || 0}
+                    </p>
+                    <p className="flex items-center">
+                      <span className="font-medium mr-2">Status:</span>
+                      <span className={`px-2 py-0.5 text-xs rounded-full ${
+                        selectedWO.details.units
+                          .find(u => u.unit_number === partRequest.unit_number)
+                          ?.stations.find(s => s.station_number === partRequest.station_number)
+                          ?.station_status === 'completed' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {selectedWO.details.units
+                          .find(u => u.unit_number === partRequest.unit_number)
+                          ?.stations.find(s => s.station_number === partRequest.station_number)
+                          ?.station_status?.replace('_', ' ') || 'Not started'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end space-x-3 pt-4">
                 <Button
@@ -775,9 +885,9 @@ export default function WorkOrdersSection({
         </div>
       )}
       {/* Modal for work order details */}
-      {selectedWO && (
+      {selectedWO?.details && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40 overflow-y-auto">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto relative animate-fade-in">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto relative animate-fade-in">
             <button
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
               onClick={handleCloseModal}
@@ -785,123 +895,113 @@ export default function WorkOrdersSection({
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="flex items-center mb-2">
-              <h3 className="font-semibold text-lg mr-3">
-                {selectedWO.product_number}
-              </h3>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full ${
-                  statusColors[selectedWO.status]
-                }`}
-              >
-                {selectedWO.status}
-              </span>
+            
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 pb-4 border-b">
+              <div>
+                <h3 className="font-semibold text-xl">
+                  {selectedWO.product_number}
+                </h3>
+                <p className="text-gray-500">{selectedWO.description}</p>
+              </div>
+              <div className="flex items-center mt-2 md:mt-0">
+                <span className={`text-sm px-3 py-1 rounded-full ${statusColors[selectedWO.status]} font-medium`}>
+                  {selectedWO.status}
+                </span>
+              </div>
             </div>
-            <div className="text-gray-500 mb-2">{selectedWO.description}</div>
-            <div className="mb-4">
-              <div className="w-full bg-gray-200 rounded h-2">
+
+            {/* Progress Bar */}
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-600 mb-1">
+                <span>Completion Progress</span>
+                <span>{selectedWO.progress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div
-                  className={`h-2 rounded ${
+                  className={`h-2.5 rounded-full ${
                     selectedWO.progress === 100 ? "bg-green-500" : "bg-blue-500"
                   }`}
                   style={{ width: `${selectedWO.progress}%` }}
                 ></div>
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Progress: {selectedWO.progress}%
-              </div>
             </div>
-            {/* Comments */}
-            <div className="mb-6">
-              <h4 className="font-semibold mb-2 flex items-center">
-                <MessageCircle className="w-4 h-4 mr-1" />
-                Comments
-              </h4>
-              <div className="space-y-2 max-h-32 overflow-y-auto mb-2">
-                {selectedWO.comments.length === 0 && (
-                  <div className="text-gray-400 text-sm">No comments yet.</div>
-                )}
-                {selectedWO.comments.map((c, i) => (
-                  <div key={i} className="bg-gray-50 rounded px-3 py-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-700">
-                        {c.user}
+
+            {/* Units and Stations */}
+            <div className="mt-6">
+              <h4 className="font-semibold text-lg mb-3">Production Units</h4>
+              <div className="space-y-4">
+                {selectedWO.details.units.map((unit) => (
+                  <div key={unit.unit_number} className="border border-gray-200 rounded-lg p-4 shadow-sm">
+                    <div className="font-medium text-gray-800 mb-3">
+                      Unit {unit.unit_number}
+                      <span className="ml-2 text-sm font-normal text-gray-500">
+                        ({unit.stations.filter(s => s.unit_status === 'completed').length}/{unit.stations.length} stations completed)
                       </span>
-                      <span className="text-xs text-gray-400">{c.time}</span>
                     </div>
-                    <p className="mt-1">{c.text}</p>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Unit {c.unit_number} • Station {c.station_number}
+                    <div className="space-y-3">
+                      {unit.stations.map((station) => (
+                        <div key={station.station_number} className="border-t border-gray-100 pt-3">
+                          <div className="flex justify-between items-center">
+                            <div className="font-medium text-gray-700">
+                              Station {station.station_number}
+                            </div>
+                            <span 
+                              className={`text-xs px-2.5 py-1 rounded-full ${
+                                station.station_status === 'completed' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : station.station_status === 'in_progress'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                              }`}
+                            >
+                              {station.station_status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          
+                          <div className="mt-2 text-sm text-gray-600 space-y-1">
+                            <div className="flex justify-between">
+                              <span>Part:</span>
+                              <span className="font-medium">
+                                {station.part_number} - {station.part_description}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Progress:</span>
+                              <span className="font-medium">
+                                {station.quantity_supplied}/{station.quantity_required} units
+                              </span>
+                            </div>
+                            {station.station_comments && (
+                              <div className="mt-1 pt-2 border-t border-gray-100">
+                                <div className="font-medium text-gray-700">Notes:</div>
+                                <p className="text-gray-600 italic">{station.station_comments}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
-              <form onSubmit={handleAddComment} className="space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit
-                </label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
-                  value={commentUnit}
-                  disabled
-                >
-                  <option value="1">Unit 1</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Station
-                </label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
-                  value={commentStation}
-                  onChange={(e) => setCommentStation(e.target.value)}
-                >
-                  <option value="1">Station 1</option>
-                  <option value="2">Station 2</option>
-                  <option value="3">Station 3</option>
-                </select>
-              </div>
             </div>
-                <div className="flex gap-2 mt-2">
-                  <input
-                    type="text"
-                    className="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Add a comment..."
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    aria-label="Comment text"
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    className="h-auto px-4 py-2 border-2 border-blue-600 bg-white text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 shadow-sm hover:shadow-md transition-all duration-200"
-                    aria-label="Send comment"
-                  >
-                    <span className="hidden sm:inline">Send</span>
-                    <MessageCircle className="w-4 h-4 sm:hidden" />
-                  </Button>
-                </div>
-              </form>
             </div>
             {/* Request Parts */}
-            {selectedWO.status === "In Progress" && (
+            {selectedWO?.status === "In Progress" && (
               <div>
                 <h4 className="font-semibold mb-2 flex items-center">
                   <Package className="w-4 h-4 mr-1" />
                   Request Parts
                 </h4>
                 <div className="space-y-1 mb-2">
-                  {selectedWO.partsRequested.length === 0 && (
+                  {selectedWO?.partsRequested?.length === 0 && (
                     <div className="text-gray-400 text-sm">
                       No parts requested yet.
                     </div>
                   )}
-                  {selectedWO.partsRequested.map((p, i) => (
+                  {selectedWO?.partsRequested?.map((p, i) => (
                     <div key={i} className="text-sm text-gray-700">
-                      Part #{p.part} &times; {p.qty}
+                      Part #{p.part_number} &times; {p.quantity_requested}
                     </div>
                   ))}
                 </div>
@@ -961,7 +1061,7 @@ export default function WorkOrdersSection({
               </div>
             )}
           </div>
-        </div>
+
       )}
     </div>
   );

@@ -84,9 +84,7 @@ const sections = [
     key: "comments",
     label: "Comments & Issues",
     icon: <MessageCircle className="w-5 h-5 mr-2" />,
-    content: (
-      <CommentsSection workOrderId={""} unitNumber={""} stationNumber={""} />
-    ),
+    content: <CommentsSection />,
     notificationCount: newCommentsCount,
   },
   {
