@@ -82,26 +82,19 @@ export default function DashboardSidebar({ sections, selected, setSelected, side
 
     return (
         <>
-            {/* Mobile overlay */}
-            {sidebarOpen && (
-                <div 
-                    className="fixed inset-0 bg-black/50 z-30 lg:hidden transition-opacity duration-300 ease-in-out"
-                    onClick={() => setSidebarOpen(false)}
-                    aria-hidden="true"
-                />
-            )}
-            
-            <aside
-                ref={sidebarRef}
-                className={`fixed lg:sticky top-0 left-0 h-screen w-72 bg-white shadow-xl flex-shrink-0 transition-all duration-300 ease-in-out z-40
-                    transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                    lg:translate-x-0 lg:relative lg:h-auto lg:rounded-xl lg:shadow-sm`}
-                style={{
-                    maxHeight: '100vh',
-                    WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
-                }}
-                aria-label="Dashboard navigation"
-            >
+        <aside
+            ref={sidebarRef}
+            className={`fixed lg:sticky top-0 left-0 h-screen w-72 bg-white shadow-xl flex-shrink-0 transition-transform duration-300 ease-in-out z-40
+                transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                lg:translate-x-0 lg:relative lg:h-[calc(100vh-7.5rem)] lg:top-6 lg:rounded-xl lg:shadow-sm`}
+            style={{
+                // paddingTop: '4rem', // Space for header
+                height: '100vh',
+                maxHeight: '100vh',
+                WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+            }}
+            aria-label="Dashboard navigation"
+        >
                 {/* Mobile header */}
                 <div className="flex justify-between items-center p-4 border-b border-gray-100 lg:hidden">
                     <h2 className="text-lg font-semibold text-gray-900">Navigation</h2>

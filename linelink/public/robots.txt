@@ -1,0 +1,15 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://your-production-url.com/sitemap.xml
+
+# Disallow admin and API routes
+Disallow: /api/
+Disallow: /admin/
+Disallow: /_next/
+Disallow: /*/edit/
+Disallow: /*/delete/
+
+# Crawl-delay: 10  # Uncomment and adjust if needed to limit crawl rate

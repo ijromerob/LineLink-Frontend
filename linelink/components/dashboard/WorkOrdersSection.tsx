@@ -777,7 +777,7 @@ export default function WorkOrdersSection({
       {/* Modal for work order details */}
       {selectedWO && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto relative animate-fade-in my-8">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto relative animate-fade-in">
             <button
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
               onClick={handleCloseModal}

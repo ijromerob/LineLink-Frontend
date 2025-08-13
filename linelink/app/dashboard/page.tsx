@@ -556,7 +556,7 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      <div className="flex flex-1 flex-col lg:flex-row w-full max-w-7xl mx-auto px-0 sm:px-2 lg:px-6 py-0 lg:py-6 gap-0 lg:gap-6">
+      <div className="flex flex-1 flex-col lg:flex-row w-full max-w-7xl mx-auto px-0 sm:px-2 lg:px-6 py-0 lg:py-6 gap-0 lg:gap-6 h-[calc(100vh-4rem)]">
         {/* Sidebar - Mobile Overlay */}
         <div 
           className={`fixed inset-0 bg-black/50 z-30 lg:hidden transition-opacity duration-300 ease-in-out ${
@@ -568,12 +568,11 @@ export default function Dashboard() {
         
         {/* Sidebar */}
         <div 
-          className={`fixed lg:sticky top-16 lg:top-6 left-0 h-[calc(100vh-4rem)] lg:h-[calc(100vh-3rem)] w-72 bg-white lg:bg-transparent z-40 transform transition-all duration-300 ease-in-out lg:translate-x-0 ${
+          className={`fixed lg:sticky top-16 lg:top-6 left-0 h-[calc(100vh-4rem)] lg:h-[calc(100vh-3rem)] w-72 bg-white lg:bg-transparent z-40 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
             sidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full lg:translate-x-0'
           }`}
-          style={{ overflowY: "auto" }}
         >
-          <div className="h-full p-4 lg:p-0">
+          <div className="h-full flex flex-col p-4 lg:p-0">
             <DashboardSidebar
               sections={sections}
               selected={selected}
@@ -593,8 +592,10 @@ export default function Dashboard() {
         <main
           className="flex-1 w-full bg-white lg:rounded-xl shadow-sm p-4 sm:p-6 overflow-y-auto transition-all duration-300"
           style={{ 
-            '--max-height': 'calc(100vh - 4rem)',
-            minHeight: 'calc(100vh - 4rem)'
+            maxHeight: 'calc(100vh - 4rem - 1.5rem)', // Account for top padding
+            minHeight: '100%',
+            scrollbarWidth: 'thin',
+            scrollbarGutter: 'stable'
           } as React.CSSProperties}
         >
           <div className="max-w-full">
